@@ -1,6 +1,5 @@
 use std::{
-    ffi::c_uint,
-    ops::{BitAnd, BitOr, BitOrAssign},
+    ops::{BitAnd, BitOr, BitOrAssign}, os::raw::c_uint,
 };
 
 use crate::{
