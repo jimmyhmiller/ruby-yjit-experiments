@@ -39,7 +39,7 @@ pub extern "C" fn rb_yjit_disasm_iseq(_ec: EcPtr, _ruby_self: VALUE, iseqw: VALU
         // That's a good thing - this prints to console.
         let out_string = disasm_iseq_insn_range(iseq, 0, 9999);
 
-        return rust_str_to_ruby(&out_string);
+        rust_str_to_ruby(&out_string)
     }
 }
 
@@ -55,19 +55,12 @@ pub fn disasm_iseq_insn_range(iseq: IseqPtr, start_idx: u32, end_idx: u32) -> St
 
     // Sort the blocks by increasing start addresses
     block_list.sort_by(|a, b| {
-        use std::cmp::Ordering;
 
         // Get the start addresses for each block
         let addr_a = a.borrow().get_start_addr().raw_ptr();
         let addr_b = b.borrow().get_start_addr().raw_ptr();
 
-        if addr_a < addr_b {
-            Ordering::Less
-        } else if addr_a == addr_b {
-            Ordering::Equal
-        } else {
-            Ordering::Greater
-        }
+        addr_a.cmp(&addr_b)
     });
 
     // Compute total code size in bytes for all blocks in the function
@@ -122,7 +115,7 @@ pub fn disasm_iseq_insn_range(iseq: IseqPtr, start_idx: u32, end_idx: u32) -> St
         }
     }
 
-    return out;
+    out
 }
 
 #[cfg(feature = "disasm")]
@@ -137,7 +130,7 @@ pub fn dump_disasm_addr_range(
 
     for (start_addr, end_addr) in cb.writable_addrs(start_addr, end_addr) {
         let disasm = disasm_addr_range(cb, start_addr, end_addr);
-        if disasm.len() > 0 {
+        if disasm.is_empty() {
             match dump_disasm {
                 DumpDisasm::Stdout => println!("{disasm}"),
                 DumpDisasm::File(path) => {
@@ -201,7 +194,7 @@ pub fn disasm_addr_range(cb: &CodeBlock, start_addr: usize, end_addr: usize) -> 
         write!(&mut out, "\x1b[0m").unwrap();
     }
 
-    return out;
+    out
 }
 
 /// Primitive called in yjit.rb

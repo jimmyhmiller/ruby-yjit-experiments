@@ -6099,11 +6099,8 @@ fn gen_send_general(
     {
         let class_name = unsafe { cstr_to_rust_string(rb_class2name(comptime_recv_klass)) };
         let method_name = unsafe { cstr_to_rust_string(rb_id2name(mid)) };
-        match (class_name, method_name) {
-            (Some(class_name), Some(method_name)) => {
-                asm.comment(&format!("call to {}#{}", class_name, method_name))
-            }
-            _ => {}
+        if let (Some(class_name), Some(method_name)) = (class_name, method_name) {
+            asm.comment(&format!("call to {}#{}", class_name, method_name))
         }
     }
 

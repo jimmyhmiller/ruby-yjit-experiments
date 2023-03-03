@@ -315,17 +315,17 @@ pub mod tests {
     // Track allocation requests and owns some fixed size backing memory for requests.
     // While testing we don't execute generated code.
     pub struct TestingAllocator {
-        requests: Vec<AllocRequest>,
+        requests: Vec<AllocMarkRequest>,
         memory: Vec<u8>,
     }
 
     #[derive(Debug)]
-    enum AllocRequest {
-        MarkWritable { start_idx: usize, length: usize },
-        MarkExecutable { start_idx: usize, length: usize },
-        MarkUnused,
+    enum AllocMarkRequest {
+        Writable { start_idx: usize, length: usize },
+        Executable { start_idx: usize, length: usize },
+        Unused,
     }
-    use AllocRequest::*;
+    use AllocMarkRequest::*;
 
     impl TestingAllocator {
         pub fn new(mem_size: usize) -> Self {
@@ -355,7 +355,7 @@ pub mod tests {
     impl super::Allocator for TestingAllocator {
         fn mark_writable(&mut self, ptr: *const u8, length: u32) -> bool {
             let index = self.bounds_check_request(ptr, length);
-            self.requests.push(MarkWritable {
+            self.requests.push(Writable {
                 start_idx: index,
                 length: length.into_usize(),
             });
@@ -365,7 +365,7 @@ pub mod tests {
 
         fn mark_executable(&mut self, ptr: *const u8, length: u32) {
             let index = self.bounds_check_request(ptr, length);
-            self.requests.push(MarkExecutable {
+            self.requests.push(Executable {
                 start_idx: index,
                 length: length.into_usize(),
             });
@@ -376,7 +376,7 @@ pub mod tests {
 
         fn mark_unused(&mut self, ptr: *const u8, length: u32) -> bool {
             self.bounds_check_request(ptr, length);
-            self.requests.push(MarkUnused);
+            self.requests.push(Unused);
 
             true
         }
@@ -431,7 +431,7 @@ pub mod tests {
 
         assert!(matches!(
             virt.allocator.requests[..],
-            [MarkWritable {
+            [Writable {
                 start_idx: 0,
                 length: PAGE_SIZE
             }],
@@ -463,11 +463,11 @@ pub mod tests {
         assert!(matches!(
             virt.allocator.requests[..],
             [
-                MarkWritable {
+                Writable {
                     start_idx: 0,
                     length: THREE_PAGES
                 },
-                MarkExecutable {
+                Executable {
                     start_idx: 0,
                     length: THREE_PAGES
                 },
