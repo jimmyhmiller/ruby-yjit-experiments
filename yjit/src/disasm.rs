@@ -228,17 +228,14 @@ pub extern "C" fn rb_yjit_insns_compiled(_ec: EcPtr, _ruby_self: VALUE, iseqw: V
             let insn_ary = rb_ary_new_capa((insn_vec.len() * 2) as i64);
 
             // For each instruction compiled
-            for idx in 0..insn_vec.len() {
-                let op_name = &insn_vec[idx].0;
-                let insn_idx = insn_vec[idx].1;
-
+            for (idx, (op_name, insn_idx)) in insn_vec.iter().enumerate() {
                 let op_sym = rust_str_to_sym(op_name);
 
                 // Store the instruction index and opcode symbol
                 rb_ary_store(
                     insn_ary,
                     2 * idx as i64,
-                    VALUE::fixnum_from_usize(insn_idx as usize),
+                    VALUE::fixnum_from_usize(*insn_idx as usize),
                 );
                 rb_ary_store(insn_ary, (2 * idx + 1) as i64, op_sym);
             }

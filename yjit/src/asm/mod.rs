@@ -220,8 +220,8 @@ impl CodeBlock {
     }
 
     /// Free the memory pages of given code page indexes
-    fn free_pages(&mut self, page_idxs: &Vec<usize>) {
-        let mut page_idxs = page_idxs.clone();
+    fn free_pages(&mut self, page_idxs: &[usize]) {
+        let mut page_idxs = page_idxs.to_owned();
         page_idxs.reverse(); // to loop with pop()
 
         // Group adjacent page indexes and free them in batches to reduce the # of syscalls.

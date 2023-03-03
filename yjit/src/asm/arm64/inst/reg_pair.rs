@@ -9,6 +9,7 @@ enum Opc {
     Opc64 = 0b10,
 }
 
+#[allow(clippy::enum_variant_names)]
 /// The kind of indexing to perform for this instruction.
 enum Index {
     StorePostIndex = 0b010,

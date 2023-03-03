@@ -11,8 +11,14 @@ pub struct Nop;
 impl Nop {
     /// NOP
     /// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/NOP--No-Operation-
-    pub fn nop() -> Self {
+    pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for Nop {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -37,7 +43,7 @@ mod tests {
 
     #[test]
     fn test_nop() {
-        let inst = Nop::nop();
+        let inst = Nop::new();
         let result: u32 = inst.into();
         assert_eq!(0xd503201f, result);
     }

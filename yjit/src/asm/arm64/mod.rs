@@ -2,7 +2,9 @@
 
 use crate::asm::CodeBlock;
 
+#[allow(clippy::upper_case_acronyms)]
 mod arg;
+#[allow(clippy::upper_case_acronyms)]
 mod inst;
 mod opnd;
 
@@ -941,7 +943,7 @@ pub fn mvn(cb: &mut CodeBlock, rd: A64Opnd, rm: A64Opnd) {
 
 /// NOP - no-operation, used for alignment purposes
 pub fn nop(cb: &mut CodeBlock) {
-    let bytes: [u8; 4] = Nop::nop().into();
+    let bytes: [u8; 4] = Nop::new().into();
 
     cb.write_bytes(&bytes);
 }

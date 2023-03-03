@@ -104,24 +104,12 @@ impl Type {
 
     /// Check if the type is an immediate
     pub fn is_imm(&self) -> bool {
-        match self {
-            Type::UnknownImm => true,
-            Type::Nil => true,
-            Type::True => true,
-            Type::False => true,
-            Type::Fixnum => true,
-            Type::Flonum => true,
-            Type::ImmSymbol => true,
-            _ => false,
-        }
+        matches!(self, Type::UnknownImm | Type::Nil | Type::True | Type::False | Type::Fixnum | Type::Flonum | Type::ImmSymbol)
     }
 
     /// Returns true when the type is not specific.
     pub fn is_unknown(&self) -> bool {
-        match self {
-            Type::Unknown | Type::UnknownImm | Type::UnknownHeap => true,
-            _ => false,
-        }
+        matches!(self, Type::Unknown | Type::UnknownImm | Type::UnknownHeap)
     }
 
     /// Returns true when we know the VALUE is a specific handle type,
@@ -133,25 +121,21 @@ impl Type {
 
     /// Check if the type is a heap object
     pub fn is_heap(&self) -> bool {
-        match self {
-            Type::UnknownHeap => true,
-            Type::TArray => true,
-            Type::CArray => true,
-            Type::Hash => true,
-            Type::HeapSymbol => true,
-            Type::TString => true,
-            Type::CString => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Type::UnknownHeap
+                | Type::TArray
+                | Type::CArray
+                | Type::Hash
+                | Type::HeapSymbol
+                | Type::TString
+                | Type::CString
+        )
     }
 
     /// Check if it's a T_ARRAY object (both TArray and CArray are T_ARRAY)
     pub fn is_array(&self) -> bool {
-        match self {
-            Type::TArray => true,
-            Type::CArray => true,
-            _ => false,
-        }
+        matches!(self, Type::TArray | Type::CArray)
     }
 
     /// Returns an Option with the T_ value type if it is known, otherwise None
@@ -277,10 +261,10 @@ pub enum TypeDiff {
 // self, a local variable or constant so that we can track its type
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TempMapping {
-    MapToStack, // Normal stack value
-    MapToSelf,  // Temp maps to the self operand
-    MapToLocal(LocalIndex), // Temp maps to a local variable with index
-                //ConstMapping,         // Small constant (0, 1, 2, Qnil, Qfalse, Qtrue)
+    Stack,  // Normal stack value
+    ToSelf, // Temp maps to the self operand
+    Local(LocalIndex), // Temp maps to a local variable with index
+            //ConstMapping,         // Small constant (0, 1, 2, Qnil, Qfalse, Qtrue)
 }
 
 // Index used by MapToLocal. Using this instead of u8 makes TempMapping 1 byte.
@@ -329,7 +313,7 @@ impl From<u8> for LocalIndex {
 
 impl Default for TempMapping {
     fn default() -> Self {
-        MapToStack
+        Stack
     }
 }
 
@@ -876,7 +860,7 @@ pub extern "C" fn rb_yjit_iseq_mark(payload: *mut c_void) {
 
             // Walk over references to objects in generated code.
             for offset in block.gc_obj_offsets.iter() {
-                let value_address: *const u8 = cb.get_ptr(offset.as_usize()).raw_ptr();
+                let value_address: *const u8 = cb.get_ptr(offset.into_usize()).raw_ptr();
                 // Creating an unaligned pointer is well defined unlike in C.
                 let value_address = value_address as *const VALUE;
 
@@ -923,7 +907,7 @@ pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
 
             // Walk over references to objects in generated code.
             for offset in block.gc_obj_offsets.iter() {
-                let offset_to_value = offset.as_usize();
+                let offset_to_value = offset.into_usize();
                 let value_code_ptr = cb.get_ptr(offset_to_value);
                 let value_ptr: *const u8 = value_code_ptr.raw_ptr();
                 // Creating an unaligned pointer is well defined unlike in C.
@@ -967,7 +951,7 @@ pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
 
 /// Get all blocks for a particular place in an iseq.
 fn get_version_list(blockid: BlockId) -> Option<&'static mut VersionList> {
-    let insn_idx = blockid.idx.as_usize();
+    let insn_idx = blockid.idx.into_usize();
     match get_iseq_payload(blockid.iseq) {
         Some(payload) if insn_idx < payload.version_map.len() => {
             Some(payload.version_map.get_mut(insn_idx).unwrap())
@@ -979,7 +963,7 @@ fn get_version_list(blockid: BlockId) -> Option<&'static mut VersionList> {
 /// Get or create all blocks for a particular place in an iseq.
 fn get_or_create_version_list(blockid: BlockId) -> &'static mut VersionList {
     let payload = get_or_create_iseq_payload(blockid.iseq);
-    let insn_idx = blockid.idx.as_usize();
+    let insn_idx = blockid.idx.into_usize();
 
     // Expand the version map as necessary
     if insn_idx >= payload.version_map.len() {
@@ -993,7 +977,7 @@ fn get_or_create_version_list(blockid: BlockId) -> &'static mut VersionList {
 
 /// Take all of the blocks for a particular place in an iseq
 pub fn take_version_list(blockid: BlockId) -> VersionList {
-    let insn_idx = blockid.idx.as_usize();
+    let insn_idx = blockid.idx.into_usize();
     match get_iseq_payload(blockid.iseq) {
         Some(payload) if insn_idx < payload.version_map.len() => {
             mem::take(&mut payload.version_map[insn_idx])
@@ -1004,7 +988,7 @@ pub fn take_version_list(blockid: BlockId) -> VersionList {
 
 /// Count the number of block versions matching a given blockid
 fn get_num_versions(blockid: BlockId) -> usize {
-    let insn_idx = blockid.idx.as_usize();
+    let insn_idx = blockid.idx.into_usize();
     match get_iseq_payload(blockid.iseq) {
         Some(payload) => payload
             .version_map
@@ -1085,9 +1069,11 @@ pub fn limit_block_versions(blockid: BlockId, ctx: &Context) -> Context {
         // Produce a generic context that stores no type information,
         // but still respects the stack_size and sp_offset constraints.
         // This new context will then match all future requests.
-        let mut generic_ctx = Context::default();
-        generic_ctx.stack_size = ctx.stack_size;
-        generic_ctx.sp_offset = ctx.sp_offset;
+        let generic_ctx = Context {
+            stack_size: ctx.stack_size,
+            sp_offset: ctx.sp_offset,
+            ..Default::default()
+        };
 
         debug_assert_ne!(
             TypeDiff::Incompatible,
@@ -1123,7 +1109,7 @@ fn add_block_version(blockref: &BlockRef, cb: &CodeBlock) {
 
     // Run write barriers for all objects in generated code.
     for offset in block.gc_obj_offsets.iter() {
-        let value_address: *const u8 = cb.get_ptr(offset.as_usize()).raw_ptr();
+        let value_address: *const u8 = cb.get_ptr(offset.into_usize()).raw_ptr();
         // Creating an unaligned pointer is well defined unlike in C.
         let value_address: *const VALUE = value_address.cast();
 
@@ -1158,7 +1144,7 @@ fn remove_block_version(blockref: &BlockRef) {
 //===========================================================================
 
 impl Block {
-    pub fn new(blockid: BlockId, ctx: &Context, start_addr: CodePtr) -> BlockRef {
+    pub fn make_ref(blockid: BlockId, ctx: &Context, start_addr: CodePtr) -> BlockRef {
         let block = Block {
             blockid,
             end_idx: 0,
@@ -1304,7 +1290,7 @@ impl Context {
             self.temp_mapping[stack_size] = mapping;
             self.temp_types[stack_size] = temp_type;
 
-            if let MapToLocal(idx) = mapping {
+            if let Local(idx) = mapping {
                 assert!((idx as usize) < MAX_LOCAL_TYPES);
             }
         }
@@ -1318,12 +1304,12 @@ impl Context {
     /// Push one new value on the temp stack
     /// Return a pointer to the new stack top
     pub fn stack_push(&mut self, val_type: Type) -> Opnd {
-        self.stack_push_mapping((MapToStack, val_type))
+        self.stack_push_mapping((Stack, val_type))
     }
 
     /// Push the self value on the stack
     pub fn stack_push_self(&mut self) -> Opnd {
-        self.stack_push_mapping((MapToSelf, Type::Unknown))
+        self.stack_push_mapping((ToSelf, Type::Unknown))
     }
 
     /// Push a local variable on the stack
@@ -1332,7 +1318,7 @@ impl Context {
             return self.stack_push(Type::Unknown);
         }
 
-        self.stack_push_mapping((MapToLocal((local_idx as u8).into()), Type::Unknown))
+        self.stack_push_mapping((Local((local_idx as u8).into()), Type::Unknown))
     }
 
     // Pop N values off the stack
@@ -1348,7 +1334,7 @@ impl Context {
 
             if idx < MAX_TEMP_TYPES {
                 self.temp_types[idx] = Type::Unknown;
-                self.temp_mapping[idx] = MapToStack;
+                self.temp_mapping[idx] = Stack;
             }
         }
 
@@ -1397,9 +1383,9 @@ impl Context {
                 let mapping = self.temp_mapping[stack_idx];
 
                 match mapping {
-                    MapToSelf => self.self_type,
-                    MapToStack => self.temp_types[(self.stack_size - 1 - idx) as usize],
-                    MapToLocal(idx) => {
+                    ToSelf => self.self_type,
+                    Stack => self.temp_types[(self.stack_size - 1 - idx) as usize],
+                    Local(idx) => {
                         assert!((idx as usize) < MAX_LOCAL_TYPES);
                         self.local_types[idx as usize]
                     }
@@ -1437,9 +1423,9 @@ impl Context {
                 let mapping = self.temp_mapping[stack_idx];
 
                 match mapping {
-                    MapToSelf => self.self_type.upgrade(opnd_type),
-                    MapToStack => self.temp_types[stack_idx].upgrade(opnd_type),
-                    MapToLocal(idx) => {
+                    ToSelf => self.self_type.upgrade(opnd_type),
+                    Stack => self.temp_types[stack_idx].upgrade(opnd_type),
+                    Local(idx) => {
                         let idx = idx as usize;
                         assert!(idx < MAX_LOCAL_TYPES);
                         self.local_types[idx].upgrade(opnd_type);
@@ -1458,7 +1444,7 @@ impl Context {
         let opnd_type = self.get_opnd_type(opnd);
 
         match opnd {
-            SelfOpnd => (MapToSelf, opnd_type),
+            SelfOpnd => (ToSelf, opnd_type),
             StackOpnd(idx) => {
                 assert!(idx < self.stack_size);
                 let stack_idx = (self.stack_size - 1 - idx) as usize;
@@ -1469,7 +1455,7 @@ impl Context {
                     // We can't know the source of this stack operand, so we assume it is
                     // a stack-only temporary. type will be UNKNOWN
                     assert!(opnd_type == Type::Unknown);
-                    (MapToStack, opnd_type)
+                    (Stack, opnd_type)
                 }
             }
         }
@@ -1517,14 +1503,14 @@ impl Context {
         // If any values on the stack map to this local we must detach them
         for (i, mapping) in ctx.temp_mapping.iter_mut().enumerate() {
             *mapping = match *mapping {
-                MapToStack => MapToStack,
-                MapToSelf => MapToSelf,
-                MapToLocal(idx) => {
+                Stack => Stack,
+                ToSelf => ToSelf,
+                Local(idx) => {
                     if idx as usize == local_idx {
                         ctx.temp_types[i] = ctx.local_types[idx as usize];
-                        MapToStack
+                        Stack
                     } else {
-                        MapToLocal(idx)
+                        Local(idx)
                     }
                 }
             }
@@ -1540,11 +1526,11 @@ impl Context {
         // locals. Even if local values may have changed, stack values will not.
         for (i, mapping) in self.temp_mapping.iter_mut().enumerate() {
             *mapping = match *mapping {
-                MapToStack => MapToStack,
-                MapToSelf => MapToSelf,
-                MapToLocal(idx) => {
+                Stack => Stack,
+                ToSelf => ToSelf,
+                Local(idx) => {
                     self.temp_types[i] = self.local_types[idx as usize];
-                    MapToStack
+                    Stack
                 }
             }
         }
@@ -1603,7 +1589,7 @@ impl Context {
 
             // If the two mappings aren't the same
             if src_mapping != dst_mapping {
-                if dst_mapping == MapToStack {
+                if dst_mapping == Stack {
                     // We can safely drop information about the source of the temp
                     // stack operand.
                     diff += 1;
@@ -1933,7 +1919,7 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
     let mut branch = branch_rc.borrow_mut();
     let branch_size_on_entry = branch.code_size();
 
-    let target_idx: usize = target_idx.as_usize();
+    let target_idx: usize = target_idx.into_usize();
     let target = branch.targets[target_idx].as_ref().unwrap();
     let target_blockid = target.get_blockid();
     let target_ctx = target.get_ctx();
@@ -2104,7 +2090,7 @@ fn set_branch_target(
         block.push_incoming(branchref.clone());
 
         // Fill out the target with this block
-        branch.targets[target_idx.as_usize()] =
+        branch.targets[target_idx.into_usize()] =
             Some(Box::new(BranchTarget::Block(blockref.clone())));
 
         return;
@@ -2140,7 +2126,7 @@ fn set_branch_target(
         // No space
     } else {
         // Fill the branch target with a stub
-        branch.targets[target_idx.as_usize()] =
+        branch.targets[target_idx.into_usize()] =
             Some(Box::new(BranchTarget::Stub(Box::new(BranchStub {
                 address: Some(stub_addr),
                 id: target,
@@ -2463,6 +2449,7 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
     let block = blockref.borrow().clone();
     for branchref in &block.incoming {
         let mut branch = branchref.borrow_mut();
+
         let target_idx = if branch.get_target_address(0) == Some(block_start) {
             0
         } else {

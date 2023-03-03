@@ -97,8 +97,10 @@ pub type RedefinitionFlag = u32;
 
 #[allow(dead_code)]
 #[allow(clippy::useless_transmute)]
+#[allow(clippy::upper_case_acronyms)]
 mod autogened {
     use super::*;
+
     // Textually include output from rust-bindgen as suggested by its user guide.
     include!("cruby_bindings.inc.rs");
 }
@@ -238,6 +240,7 @@ pub struct rb_iseq_t {
 /// thankfully those cases are rare and don't cross the FFI boundary.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 #[repr(transparent)] // same size and alignment as simply `usize`
+#[allow(clippy::upper_case_acronyms)]
 pub struct VALUE(pub usize);
 
 /// Pointer to an ISEQ

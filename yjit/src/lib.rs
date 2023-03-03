@@ -1,3 +1,5 @@
+
+#![allow(clippy::too_many_arguments)] // temporary so I can fix others
 mod asm;
 mod backend;
 mod call_flags;

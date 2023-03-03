@@ -62,7 +62,7 @@ pub extern "C" fn rb_yjit_init_rust() {
         YJIT_ENABLED.store(true, Ordering::Release);
     });
 
-    if let Err(_) = result {
+    if result.is_err() {
         println!("YJIT: rb_yjit_init_rust() panicked. Aborting.");
         std::process::abort();
     }

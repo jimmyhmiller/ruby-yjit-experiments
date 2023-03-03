@@ -1,5 +1,6 @@
 use super::super::arg::{truncate_uimm, Sf};
 
+#[allow(clippy::upper_case_acronyms)]
 /// The struct that represents an A64 signed bitfield move instruction that can
 /// be encoded.
 ///

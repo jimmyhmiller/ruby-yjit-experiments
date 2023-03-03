@@ -163,10 +163,7 @@ impl X86Opnd {
     }
 
     pub fn is_some(&self) -> bool {
-        match self {
-            X86Opnd::None => false,
-            _ => true
-        }
+        !matches!(self, X86Opnd::None)
     }
 
 }
@@ -297,13 +294,12 @@ pub fn mem_opnd(num_bits: u8, base_reg: X86Opnd, disp: i32) -> X86Opnd
 /// Memory operand with SIB (Scale Index Base) indexing
 pub fn mem_opnd_sib(num_bits: u8, base_opnd: X86Opnd, index_opnd: X86Opnd, scale: i32, disp: i32) -> X86Opnd {
     if let (X86Opnd::Reg(base_reg), X86Opnd::Reg(index_reg)) = (base_opnd, index_opnd) {
-        let scale_exp: u8;
 
-        match scale {
-            8 => { scale_exp = 3; },
-            4 => { scale_exp = 2; },
-            2 => { scale_exp = 1; },
-            1 => { scale_exp = 0; },
+        let scale_exp = match scale {
+            8 => { 3 },
+            4 => { 2 },
+            2 => { 1 },
+            1 => { 0 },
             _ => unreachable!()
         };
 

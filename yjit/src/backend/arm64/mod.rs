@@ -365,15 +365,12 @@ impl Assembler {
             let mut opnd_iter = insn.opnd_iter_mut();
 
             while let Some(opnd) = opnd_iter.next() {
-                match opnd {
-                    Opnd::Value(value) => {
-                        if value.special_const_p() {
-                            *opnd = Opnd::UImm(value.as_u64());
-                        } else if !is_load {
-                            *opnd = asm.load(*opnd);
-                        }
+                if let Opnd::Value(value) = opnd {
+                    if value.special_const_p() {
+                        *opnd = Opnd::UImm(value.as_u64());
+                    } else if !is_load {
+                        *opnd = asm.load(*opnd);
                     }
-                    _ => {}
                 };
             }
 

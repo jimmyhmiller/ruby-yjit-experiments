@@ -88,7 +88,7 @@ impl<A: Allocator> VirtualMemory<A> {
         size_bytes: usize,
     ) -> Self {
         assert_ne!(0, page_size);
-        let page_size_bytes = page_size.as_usize();
+        let page_size_bytes = page_size.into_usize();
 
         Self {
             region_start: virt_region_start,
@@ -229,7 +229,7 @@ impl<A: Allocator> VirtualMemory<A> {
         let mapped_region = self.start_ptr().raw_ptr()..self.mapped_end_ptr().raw_ptr();
         let virtual_region = self.start_ptr().raw_ptr()..self.virtual_end_ptr().raw_ptr();
         let last_byte_to_free = start_ptr
-            .add_bytes(size.saturating_sub(1).as_usize())
+            .add_bytes(size.saturating_sub(1).into_usize())
             .raw_ptr();
         assert!(mapped_region.contains(&start_ptr.raw_ptr()));
         // On platforms where code page size != memory page size (e.g. Linux), we often need
@@ -345,7 +345,7 @@ pub mod tests {
             let index = ptr as usize - mem_start;
 
             assert!(index < self.memory.len());
-            assert!(index + size.as_usize() <= self.memory.len());
+            assert!(index + size.into_usize() <= self.memory.len());
 
             index
         }
@@ -357,7 +357,7 @@ pub mod tests {
             let index = self.bounds_check_request(ptr, length);
             self.requests.push(MarkWritable {
                 start_idx: index,
-                length: length.as_usize(),
+                length: length.into_usize(),
             });
 
             true
@@ -367,7 +367,7 @@ pub mod tests {
             let index = self.bounds_check_request(ptr, length);
             self.requests.push(MarkExecutable {
                 start_idx: index,
-                length: length.as_usize(),
+                length: length.into_usize(),
             });
 
             // We don't try to execute generated code in cfg(test)

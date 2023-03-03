@@ -138,10 +138,7 @@ impl Opnd {
     }
 
     pub fn is_some(&self) -> bool {
-        match *self {
-            Opnd::None => false,
-            _ => true,
-        }
+        matches!(*self, Opnd::None)
     }
 
     /// Unwrap a register operand
@@ -188,7 +185,7 @@ impl Opnd {
 
     /// Maps the indices from a previous list of instructions to a new list of
     /// instructions.
-    pub fn map_index(self, indices: &Vec<usize>) -> Opnd {
+    pub fn map_index(self, indices: &[usize]) -> Opnd {
         match self {
             Opnd::InsnOut { idx, num_bits } => Opnd::InsnOut {
                 idx: indices[idx],
@@ -1245,7 +1242,7 @@ impl Assembler {
 
         // Mutate the pool bitmap to indicate that the register at that index
         // has been allocated and is live.
-        fn alloc_reg(pool: &mut u32, regs: &Vec<Reg>) -> Option<Reg> {
+        fn alloc_reg(pool: &mut u32, regs: &[Reg]) -> Option<Reg> {
             for (index, reg) in regs.iter().enumerate() {
                 if (*pool & (1 << index)) == 0 {
                     *pool |= 1 << index;
@@ -1256,7 +1253,7 @@ impl Assembler {
         }
 
         // Allocate a specific register
-        fn take_reg(pool: &mut u32, regs: &Vec<Reg>, reg: &Reg) -> Reg {
+        fn take_reg(pool: &mut u32, regs: &[Reg], reg: &Reg) -> Reg {
             let reg_index = regs.iter().position(|elem| elem.reg_no == reg.reg_no);
 
             if let Some(reg_index) = reg_index {
@@ -1270,7 +1267,7 @@ impl Assembler {
         // Mutate the pool bitmap to indicate that the given register is being
         // returned as it is no longer used by the instruction that previously
         // held it.
-        fn dealloc_reg(pool: &mut u32, regs: &Vec<Reg>, reg: &Reg) {
+        fn dealloc_reg(pool: &mut u32, regs: &[Reg], reg: &Reg) {
             let reg_index = regs.iter().position(|elem| elem.reg_no == reg.reg_no);
 
             if let Some(reg_index) = reg_index {

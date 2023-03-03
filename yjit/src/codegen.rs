@@ -326,7 +326,7 @@ fn verify_ctx(jit: &JITState, ctx: &Context) {
         let val_type = Type::from(stack_val);
 
         match learned_mapping {
-            TempMapping::MapToSelf => {
+            TempMapping::ToSelf => {
                 if self_val != stack_val {
                     panic!(
                         "verify_ctx: stack value was mapped to self, but values did not match!\n  stack: {}\n  self: {}",
@@ -335,7 +335,7 @@ fn verify_ctx(jit: &JITState, ctx: &Context) {
                     );
                 }
             }
-            TempMapping::MapToLocal(local_idx) => {
+            TempMapping::Local(local_idx) => {
                 let local_idx: u8 = local_idx.into();
                 let local_val = jit.peek_at_local(local_idx.into());
                 if local_val != stack_val {
@@ -347,7 +347,7 @@ fn verify_ctx(jit: &JITState, ctx: &Context) {
                     );
                 }
             }
-            TempMapping::MapToStack => {}
+            TempMapping::Stack => {}
         }
 
         // If the actual type differs from the learned type
@@ -724,7 +724,7 @@ pub fn gen_single_block(
     let starting_insn_idx = insn_idx;
 
     // Allocate the new block
-    let blockref = Block::new(blockid, &ctx, cb.get_write_ptr());
+    let blockref = Block::make_ref(blockid, &ctx, cb.get_write_ptr());
 
     // Initialize a JIT state object
     let mut jit = JITState::new(&blockref);
@@ -763,7 +763,7 @@ pub fn gen_single_block(
         // We need opt_getconstant_path to be in a block all on its own. Cut the block short
         // if we run into it. This is necessary because we want to invalidate based on the
         // instruction's index.
-        if opcode == YARVINSN_opt_getconstant_path.as_usize() && insn_idx > starting_insn_idx {
+        if opcode == YARVINSN_opt_getconstant_path.into_usize() && insn_idx > starting_insn_idx {
             jump_to_next_insn(&mut jit, &ctx, &mut asm, ocb);
             break;
         }
@@ -1005,7 +1005,7 @@ fn gen_putobject_int2fix(
     _ocb: &mut OutlinedCb,
 ) -> CodegenStatus {
     let opcode = jit.opcode;
-    let cst_val: usize = if opcode == YARVINSN_putobject_INT2FIX_0_.as_usize() {
+    let cst_val: usize = if opcode == YARVINSN_putobject_INT2FIX_0_.into_usize() {
         0
     } else {
         1
@@ -1048,7 +1048,7 @@ fn gen_putspecialobject(
 ) -> CodegenStatus {
     let object_type = jit.get_arg(0).as_usize();
 
-    if object_type == VM_SPECIAL_OBJECT_VMCORE.as_usize() {
+    if object_type == VM_SPECIAL_OBJECT_VMCORE.into_usize() {
         let stack_top = ctx.stack_push(Type::UnknownHeap);
         let frozen_core = unsafe { rb_mRubyVMFrozenCore };
         asm.mov(stack_top, frozen_core.into());
@@ -1181,7 +1181,7 @@ fn gen_newarray(
         vec![EC, Opnd::UImm(n.into()), values_ptr],
     );
 
-    ctx.stack_pop(n.as_usize());
+    ctx.stack_pop(n.into_usize());
     let stack_ret = ctx.stack_push(Type::CArray);
     asm.mov(stack_ret, new_ary);
 
@@ -1576,7 +1576,7 @@ fn gen_getlocal_generic(
     // Write the local at SP
     let stack_top = if level == 0 {
         let local_idx = ep_offset_to_local_idx(jit.get_iseq(), ep_offset);
-        ctx.stack_push_local(local_idx.as_usize())
+        ctx.stack_push_local(local_idx.into_usize())
     } else {
         ctx.stack_push(Type::Unknown)
     };
@@ -1650,7 +1650,7 @@ fn gen_setlocal_generic(
     }
 
     if level == 0 {
-        let local_idx = ep_offset_to_local_idx(jit.get_iseq(), ep_offset).as_usize();
+        let local_idx = ep_offset_to_local_idx(jit.get_iseq(), ep_offset).into_usize();
         ctx.set_local_type(local_idx, value_type);
     }
 
@@ -1985,7 +1985,7 @@ fn gen_get_ivar(
 
     // Compile time self is embedded and the ivar index lands within the object
     let embed_test_result =
-        unsafe { FL_TEST_RAW(comptime_receiver, VALUE(ROBJECT_EMBED.as_usize())) != VALUE(0) };
+        unsafe { FL_TEST_RAW(comptime_receiver, VALUE(ROBJECT_EMBED.into_usize())) != VALUE(0) };
 
     let expected_shape = unsafe { rb_shape_get_shape_id(comptime_receiver) };
     let shape_id_offset = unsafe { rb_shape_id_offset() };
@@ -2388,17 +2388,14 @@ fn gen_checktype(
         let val = asm.load(ctx.stack_pop(1));
 
         // Check if we know from type information
-        match val_type.known_value_type() {
-            Some(value_type) => {
-                if value_type == type_val {
-                    jit_putobject(jit, ctx, asm, Qtrue);
-                    return KeepCompiling;
-                } else {
-                    jit_putobject(jit, ctx, asm, Qfalse);
-                    return KeepCompiling;
-                }
+        if let Some(value_type) = val_type.known_value_type() {
+            if value_type == type_val {
+                jit_putobject(jit, ctx, asm, Qtrue);
+                return KeepCompiling;
+            } else {
+                jit_putobject(jit, ctx, asm, Qfalse);
+                return KeepCompiling;
             }
-            _ => (),
         }
 
         let ret = asm.new_label("ret");
@@ -3294,7 +3291,7 @@ fn gen_opt_newarray_max(
         vec![EC, num.into(), values_ptr],
     );
 
-    ctx.stack_pop(num.as_usize());
+    ctx.stack_pop(num.into_usize());
     let stack_ret = ctx.stack_push(Type::Unknown);
     asm.mov(stack_ret, val_opnd);
 
@@ -3325,7 +3322,7 @@ fn gen_opt_newarray_min(
         vec![EC, num.into(), values_ptr],
     );
 
-    ctx.stack_pop(num.as_usize());
+    ctx.stack_pop(num.into_usize());
     let stack_ret = ctx.stack_push(Type::Unknown);
     asm.mov(stack_ret, val_opnd);
 
@@ -3423,7 +3420,7 @@ fn gen_opt_case_dispatch(
     }
 
     if comptime_key.fixnum_p()
-        && comptime_key.0 <= u32::MAX.as_usize()
+        && comptime_key.0 <= u32::MAX.into_usize()
         && case_hash_all_fixnum_p(case_hash)
     {
         if !assume_bop_not_redefined(jit, ocb, INTEGER_REDEFINED_OP_FLAG, BOP_EQQ) {
@@ -3720,7 +3717,10 @@ fn jit_guard_known_klass(
             assert!(val_type.is_unknown());
 
             asm.comment("guard object is static symbol");
-            assert!(RUBY_SPECIAL_SHIFT == 8);
+            const _ : () = if RUBY_SPECIAL_SHIFT != 8 {
+                panic!("RUBY_SPECIAL_SHIFT != 8");
+            };
+
             asm.cmp(
                 obj_opnd.with_num_bits(8).unwrap(),
                 Opnd::UImm(RUBY_SYMBOL_FLAG as u64),
@@ -4227,10 +4227,10 @@ fn jit_rb_str_empty_p(
     _argc: i32,
     _known_recv_class: *const VALUE,
 ) -> bool {
-    const _: () = assert!(
-        RUBY_OFFSET_RSTRING_AS_HEAP_LEN == RUBY_OFFSET_RSTRING_EMBED_LEN,
-        "same offset to len embedded or not so we can use one code path to read the length",
-    );
+
+    const _: () = if RUBY_OFFSET_RSTRING_AS_HEAP_LEN != RUBY_OFFSET_RSTRING_EMBED_LEN {
+        panic!("same offset to len embedded or not so we can use one code path to read the length");
+    };
 
     let recv_opnd = ctx.stack_pop(1);
     let out_opnd = ctx.stack_push(Type::UnknownImm);
@@ -4861,7 +4861,7 @@ fn gen_send_cfunc(
             // Nothing to do
         }
         _ => {
-            assert!(false);
+            unreachable!("Block arg type should be None or nil or block param proxy");
         }
     }
 
@@ -5444,9 +5444,9 @@ fn gen_send_iseq(
             let kw_arg_keyword_len: usize =
                 unsafe { get_cikw_keyword_len(kw_arg) }.try_into().unwrap();
             let mut caller_kwargs: Vec<ID> = vec![0; kw_arg_keyword_len];
-            for kwarg_idx in 0..kw_arg_keyword_len {
+            for (kwarg_idx, kwarg) in caller_kwargs.iter_mut().enumerate().take(kw_arg_keyword_len) {
                 let sym = unsafe { get_cikw_keywords_idx(kw_arg, kwarg_idx.try_into().unwrap()) };
-                caller_kwargs[kwarg_idx] = unsafe { rb_sym2id(sym) };
+                *kwarg = unsafe { rb_sym2id(sym) };
             }
 
             // First, we're going to be sure that the names of every
@@ -5497,7 +5497,7 @@ fn gen_send_iseq(
             // Nothing to do
         }
         _ => {
-            assert!(false);
+            unreachable!("block_arg_type should be None, Nil, or BlockParamProxy");
         }
     }
 
@@ -5656,9 +5656,9 @@ fn gen_send_iseq(
         // on the stack.
         let mut caller_kwargs: Vec<ID> = vec![0; total_kwargs];
 
-        for kwarg_idx in 0..caller_keyword_len {
+        for (kwarg_idx, kwargs) in caller_kwargs.iter_mut().enumerate().take(caller_keyword_len) {
             let sym = unsafe { get_cikw_keywords_idx(ci_kwarg, kwarg_idx.try_into().unwrap()) };
-            caller_kwargs[kwarg_idx] = unsafe { rb_sym2id(sym) };
+            *kwargs = unsafe { rb_sym2id(sym) };
         }
         let mut kwarg_idx = caller_keyword_len;
 
@@ -5669,12 +5669,13 @@ fn gen_send_iseq(
             let mut already_passed = false;
             let callee_kwarg = unsafe { *(callee_kwargs.offset(callee_idx.try_into().unwrap())) };
 
-            for caller_idx in 0..caller_keyword_len {
-                if caller_kwargs[caller_idx] == callee_kwarg {
+            for caller in caller_kwargs.iter().take(caller_keyword_len) {
+                if *caller == callee_kwarg {
                     already_passed = true;
                     break;
                 }
             }
+
 
             if !already_passed {
                 // Reserve space on the stack for each default value we'll be
@@ -5813,7 +5814,7 @@ fn gen_send_iseq(
             vec![EC, Opnd::UImm(n.into()), values_ptr],
         );
 
-        ctx.stack_pop(n.as_usize());
+        ctx.stack_pop(n.into_usize());
         let stack_ret = ctx.stack_push(Type::CArray);
         asm.mov(stack_ret, new_ary);
     }
@@ -6763,8 +6764,10 @@ fn gen_invokesuper(
     if current_defined_class.builtin_type() == RUBY_T_ICLASS
         && unsafe {
             RB_TYPE_P((*rbasic_ptr).klass, RUBY_T_MODULE)
-                && FL_TEST_RAW((*rbasic_ptr).klass, VALUE(RMODULE_IS_REFINEMENT.as_usize()))
-                    != VALUE(0)
+                && FL_TEST_RAW(
+                    (*rbasic_ptr).klass,
+                    VALUE(RMODULE_IS_REFINEMENT.into_usize()),
+                ) != VALUE(0)
         }
     {
         return CantCompile;
@@ -7742,7 +7745,7 @@ impl CodegenGlobals {
             // (2¹⁶ bytes) pages, which should be fine. 4KiB pages seem to be the most popular though.
             let page_size = unsafe { rb_yjit_get_page_size() };
             assert_eq!(
-                virt_block as usize % page_size.as_usize(),
+                virt_block as usize % page_size.into_usize(),
                 0,
                 "Start of virtual address block should be page-aligned",
             );
@@ -7964,7 +7967,7 @@ mod tests {
             idx: 0,
         };
         let cb = CodeBlock::new_dummy(256 * 1024);
-        let block = Block::new(blockid, &Context::default(), cb.get_write_ptr());
+        let block = Block::make_ref(blockid, &Context::default(), cb.get_write_ptr());
 
         (
             JITState::new(&block),
@@ -8137,7 +8140,7 @@ mod tests {
     #[test]
     fn test_int2fix() {
         let (mut jit, mut context, mut asm, _cb, mut ocb) = setup_codegen();
-        jit.opcode = YARVINSN_putobject_INT2FIX_0_.as_usize();
+        jit.opcode = YARVINSN_putobject_INT2FIX_0_.into_usize();
         let status = gen_putobject_int2fix(&mut jit, &mut context, &mut asm, &mut ocb);
 
         let (_, tmp_type_top) = context.get_opnd_mapping(StackOpnd(0));

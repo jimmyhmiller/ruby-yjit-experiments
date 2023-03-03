@@ -434,7 +434,7 @@ pub extern "C" fn rb_yjit_constant_ic_update(iseq: *const rb_iseq_t, ic: IC, ins
         // fact a opt_getconstant_path instruction.
         assert_eq!(
             unsafe {
-                let opcode_pc = code.add(insn_idx.as_usize());
+                let opcode_pc = code.add(insn_idx.into_usize());
                 let translated_opcode: VALUE = opcode_pc.read();
                 rb_vm_insn_decode(translated_opcode)
             },
@@ -444,7 +444,7 @@ pub extern "C" fn rb_yjit_constant_ic_update(iseq: *const rb_iseq_t, ic: IC, ins
         // Find the matching opt_getinlinecache and invalidate all the blocks there
         // RUBY_ASSERT(insn_op_type(BIN(opt_getinlinecache), 1) == TS_IC);
 
-        let ic_pc = unsafe { code.add(insn_idx.as_usize() + 1) };
+        let ic_pc = unsafe { code.add(insn_idx.into_usize() + 1) };
         let ic_operand: IC = unsafe { ic_pc.read() }.as_mut_ptr();
 
         if ic == ic_operand {
