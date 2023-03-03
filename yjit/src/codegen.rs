@@ -5,6 +5,7 @@ use crate::asm::*;
 use crate::backend::ir::*;
 use crate::core::*;
 use crate::cruby::*;
+use crate::call_flags::CallFlags;
 use crate::invariants::*;
 use crate::options::*;
 use crate::stats::*;
@@ -1885,12 +1886,12 @@ fn gen_set_ivar(
     ctx: &mut Context,
     asm: &mut Assembler,
     ivar_name: ID,
-    flags: u32,
+    flags: CallFlags,
     argc: i32,
 ) -> CodegenStatus {
 
     // This is a .send call and we need to adjust the stack
-    if flags & VM_CALL_OPT_SEND != 0 {
+    if flags.is_opt_send() {
         handle_opt_send_shift_stack(asm, argc, ctx);
     }
 
@@ -4719,7 +4720,7 @@ fn gen_send_cfunc(
     cme: *const rb_callable_method_entry_t,
     block: Option<IseqPtr>,
     recv_known_klass: *const VALUE,
-    flags: u32,
+    flags: CallFlags,
     argc: i32,
 ) -> CodegenStatus {
     let cfunc = unsafe { get_cme_def_body_cfunc(cme) };
@@ -4736,12 +4737,12 @@ fn gen_send_cfunc(
     }
 
     // We aren't handling a vararg cfuncs with splat currently.
-    if flags & VM_CALL_ARGS_SPLAT != 0 && cfunc_argc == -1 {
+    if flags.is_splat() && cfunc_argc == -1 {
         gen_counter_incr!(asm, send_args_splat_cfunc_var_args);
         return CantCompile;
     }
 
-    if flags & VM_CALL_ARGS_SPLAT != 0 && flags & VM_CALL_ZSUPER != 0 {
+    if flags.is_splat() && flags.is_zsuper() {
         // zsuper methods are super calls without any arguments.
         // They are also marked as splat, but don't actually have an array
         // they pull arguments from, instead we need to change to call
@@ -4756,7 +4757,7 @@ fn gen_send_cfunc(
     // We are just going to not compile these.
     // https://docs.ruby-lang.org/en/3.2/Module.html#method-i-ruby2_keywords
     if unsafe {
-        get_iseq_flags_ruby2_keywords(jit.iseq) && flags & VM_CALL_ARGS_SPLAT != 0
+        get_iseq_flags_ruby2_keywords(jit.iseq) && flags.is_splat()
     } {
         gen_counter_incr!(asm, send_args_splat_cfunc_ruby2_keywords);
         return CantCompile;
@@ -4769,7 +4770,7 @@ fn gen_send_cfunc(
         unsafe { get_cikw_keyword_len(kw_arg) }
     };
 
-    if kw_arg_num != 0 && flags & VM_CALL_ARGS_SPLAT != 0 {
+    if kw_arg_num != 0 && flags.is_splat() {
         gen_counter_incr!(asm, send_cfunc_splat_with_kw);
         return CantCompile;
     }
@@ -4781,7 +4782,7 @@ fn gen_send_cfunc(
     }
 
     // Delegate to codegen for C methods if we have it.
-    if kw_arg.is_null() && flags & VM_CALL_OPT_SEND == 0 {
+    if kw_arg.is_null() && !flags.is_opt_send() {
         let codegen_p = lookup_cfunc_codegen(unsafe { (*cme).def });
         if let Some(known_cfunc_codegen) = codegen_p {
             if known_cfunc_codegen(jit, ctx, asm, ocb, ci, cme, block, argc, recv_known_klass) {
@@ -4814,7 +4815,7 @@ fn gen_send_cfunc(
 
 
     // If the argument count doesn't match
-    if cfunc_argc >= 0 && cfunc_argc != passed_argc && flags & VM_CALL_ARGS_SPLAT == 0 {
+    if cfunc_argc >= 0 && cfunc_argc != passed_argc && !flags.is_splat() {
         gen_counter_incr!(asm, send_cfunc_argc_mismatch);
         return CantCompile;
     }
@@ -4825,7 +4826,7 @@ fn gen_send_cfunc(
         return CantCompile;
     }
 
-    let block_arg = flags & VM_CALL_ARGS_BLOCKARG != 0;
+    let block_arg = flags.is_block_arg();
     let block_arg_type = if block_arg {
         Some(ctx.get_opnd_type(StackOpnd(0)))
     } else {
@@ -4863,7 +4864,7 @@ fn gen_send_cfunc(
     }
 
     // push_splat_args does stack manipulation so we can no longer side exit
-    if flags & VM_CALL_ARGS_SPLAT != 0 {
+    if flags.is_splat() {
         assert!(cfunc_argc >= 0);
         let required_args : u32 = (cfunc_argc as u32).saturating_sub(argc as u32 - 1);
         // + 1 because we pass self
@@ -4883,7 +4884,7 @@ fn gen_send_cfunc(
     }
 
     // This is a .send call and we need to adjust the stack
-    if flags & VM_CALL_OPT_SEND != 0 {
+    if flags.is_opt_send() {
         handle_opt_send_shift_stack(asm, argc, ctx);
     }
 
@@ -5148,7 +5149,7 @@ fn gen_send_bmethod(
     ci: *const rb_callinfo,
     cme: *const rb_callable_method_entry_t,
     block: Option<IseqPtr>,
-    flags: u32,
+    flags: CallFlags,
     argc: i32,
 ) -> CodegenStatus {
     let procv = unsafe { rb_get_def_bmethod_proc((*cme).def) };
@@ -5192,7 +5193,7 @@ fn gen_send_iseq(
     prev_ep: Option<*const VALUE>,
     cme: *const rb_callable_method_entry_t,
     block: Option<IseqPtr>,
-    flags: u32,
+    flags: CallFlags,
     argc: i32,
     captured_opnd: Option<Opnd>,
 ) -> CodegenStatus {
@@ -5232,7 +5233,7 @@ fn gen_send_iseq(
     // We are just going to not compile these.
     // https://www.rubydoc.info/stdlib/core/Proc:ruby2_keywords
     if unsafe {
-        get_iseq_flags_ruby2_keywords(jit.iseq) && flags & VM_CALL_ARGS_SPLAT != 0
+        get_iseq_flags_ruby2_keywords(jit.iseq) && flags.is_splat()
     } {
         gen_counter_incr!(asm, send_iseq_ruby2_keywords);
         return CantCompile;
@@ -5244,12 +5245,12 @@ fn gen_send_iseq(
         return CantCompile;
     }
 
-    if iseq_has_rest && flags & VM_CALL_ARGS_SPLAT != 0 {
+    if iseq_has_rest && flags.is_splat() {
         gen_counter_incr!(asm, send_iseq_has_rest_and_splat);
         return CantCompile;
     }
 
-    if iseq_has_rest && flags & VM_CALL_OPT_SEND != 0 {
+    if iseq_has_rest && flags.is_opt_send() {
         gen_counter_incr!(asm, send_iseq_has_rest_and_send);
         return CantCompile;
     }
@@ -5295,7 +5296,7 @@ fn gen_send_iseq(
         }
     }
 
-    if flags & VM_CALL_ARGS_SPLAT != 0 && flags & VM_CALL_ZSUPER != 0 {
+    if flags.is_splat() && flags.is_zsuper() {
         // zsuper methods are super calls without any arguments.
         // They are also marked as splat, but don't actually have an array
         // they pull arguments from, instead we need to change to call
@@ -5321,7 +5322,7 @@ fn gen_send_iseq(
     let opt_num = unsafe { get_iseq_body_param_opt_num(iseq) };
     let opts_missing: i32 = opt_num - opts_filled;
 
-    if doing_kw_call && flags & VM_CALL_ARGS_SPLAT != 0 {
+    if doing_kw_call && flags.is_splat() {
         gen_counter_incr!(asm, send_iseq_splat_with_kw);
         return CantCompile;
     }
@@ -5331,7 +5332,7 @@ fn gen_send_iseq(
         return CantCompile;
     }
 
-    if opts_filled < 0 && flags & VM_CALL_ARGS_SPLAT == 0 {
+    if opts_filled < 0 && !flags.is_splat() {
         // Too few arguments and no splat to make up for it
         gen_counter_incr!(asm, send_iseq_arity_error);
         return CantCompile;
@@ -5343,7 +5344,7 @@ fn gen_send_iseq(
         return CantCompile;
     }
 
-    let block_arg = flags & VM_CALL_ARGS_BLOCKARG != 0;
+    let block_arg = flags.is_block_arg();
     let block_arg_type = if block_arg {
         Some(ctx.get_opnd_type(StackOpnd(0)))
     } else {
@@ -5372,7 +5373,7 @@ fn gen_send_iseq(
     }
 
     // We will handle splat case later
-    if opt_num > 0 && flags & VM_CALL_ARGS_SPLAT == 0 {
+    if opt_num > 0 && !flags.is_splat() {
         num_params -= opts_missing as u32;
         unsafe {
             let opt_table = get_iseq_body_param_opt_table(iseq);
@@ -5481,7 +5482,7 @@ fn gen_send_iseq(
     if let (None, Some(builtin_info)) = (block, leaf_builtin) {
 
         // this is a .send call not currently supported for builtins
-        if flags & VM_CALL_OPT_SEND != 0 {
+        if flags.is_opt_send() {
             gen_counter_incr!(asm, send_send_builtin);
             return CantCompile;
         }
@@ -5534,7 +5535,7 @@ fn gen_send_iseq(
     };
 
     // push_splat_args does stack manipulation so we can no longer side exit
-    if flags & VM_CALL_ARGS_SPLAT != 0 {
+    if flags.is_splat() {
         // If block_arg0_splat, we still need side exits after this, but
         // doing push_splat_args here disallows it. So bail out.
         if block_arg0_splat {
@@ -5580,7 +5581,7 @@ fn gen_send_iseq(
     }
 
     // This is a .send call and we need to adjust the stack
-    if flags & VM_CALL_OPT_SEND != 0 {
+    if flags.is_opt_send() {
         handle_opt_send_shift_stack(asm, argc, ctx);
     }
 
@@ -5912,7 +5913,7 @@ fn gen_struct_aref(
     ci: *const rb_callinfo,
     cme: *const rb_callable_method_entry_t,
     comptime_recv: VALUE,
-    flags: u32,
+    flags: CallFlags,
     argc: i32,
 ) -> CodegenStatus {
 
@@ -5938,7 +5939,7 @@ fn gen_struct_aref(
     }
 
     // This is a .send call and we need to adjust the stack
-    if flags & VM_CALL_OPT_SEND != 0 {
+    if flags.is_opt_send() {
         handle_opt_send_shift_stack(asm, argc, ctx);
     }
 
@@ -5974,7 +5975,7 @@ fn gen_struct_aset(
     ci: *const rb_callinfo,
     cme: *const rb_callable_method_entry_t,
     comptime_recv: VALUE,
-    flags: u32,
+    flags: CallFlags,
     argc: i32,
 ) -> CodegenStatus {
     if unsafe { vm_ci_argc(ci) } != 1 {
@@ -5982,7 +5983,7 @@ fn gen_struct_aset(
     }
 
     // This is a .send call and we need to adjust the stack
-    if flags & VM_CALL_OPT_SEND != 0 {
+    if flags.is_opt_send() {
         handle_opt_send_shift_stack(asm, argc, ctx);
     }
 
@@ -6029,10 +6030,10 @@ fn gen_send_general(
     let ci = unsafe { get_call_data_ci(cd) }; // info about the call site
     let mut argc: i32 = unsafe { vm_ci_argc(ci) }.try_into().unwrap();
     let mut mid = unsafe { vm_ci_mid(ci) };
-    let mut flags = unsafe { vm_ci_flag(ci) };
+    let mut flags = CallFlags::from_ci(ci);
 
     // Don't JIT calls with keyword splat
-    if flags & VM_CALL_KW_SPLAT != 0 {
+    if flags.is_kw_splat() {
         gen_counter_incr!(asm, send_kw_splat);
         return CantCompile;
     }
@@ -6043,7 +6044,7 @@ fn gen_send_general(
         return EndBlock;
     }
 
-    let recv_idx = argc + if flags & VM_CALL_ARGS_BLOCKARG != 0 { 1 } else { 0 };
+    let recv_idx = argc + if flags.is_block_arg() { 1 } else { 0 };
     let comptime_recv = jit.peek_at_stack(ctx, recv_idx as isize);
     let comptime_recv_klass = comptime_recv.class_of();
 
@@ -6103,7 +6104,7 @@ fn gen_send_general(
             // Can always call public methods
         }
         METHOD_VISI_PRIVATE => {
-            if flags & VM_CALL_FCALL == 0 {
+            if !flags.is_fcall() {
                 // Can only call private methods with FCALL callsites.
                 // (at the moment they are callsites without a receiver or an explicit `self` receiver)
                 return CantCompile;
@@ -6111,7 +6112,7 @@ fn gen_send_general(
         }
         METHOD_VISI_PROTECTED => {
             // If the method call is an FCALL, it is always valid
-            if flags & VM_CALL_FCALL == 0 {
+            if !flags.is_fcall() {
                 // otherwise we need an ancestry check to ensure the receiver is valid to be called
                 // as protected
                 jit_protected_callee_ancestry_guard(asm, ocb, cme, side_exit);
@@ -6151,7 +6152,7 @@ fn gen_send_general(
                 );
             }
             VM_METHOD_TYPE_IVAR => {
-                if flags & VM_CALL_ARGS_SPLAT != 0 {
+                if flags.is_splat() {
                     gen_counter_incr!(asm, send_args_splat_ivar);
                     return CantCompile;
                 }
@@ -6163,7 +6164,7 @@ fn gen_send_general(
                 }
 
                 // This is a .send call not supported right now for getters
-                if flags & VM_CALL_OPT_SEND != 0 {
+                if flags.is_opt_send() {
                     gen_counter_incr!(asm, send_send_getter);
                     return CantCompile;
                 }
@@ -6184,7 +6185,7 @@ fn gen_send_general(
 
                 let ivar_name = unsafe { get_cme_def_body_attr_id(cme) };
 
-                if flags & VM_CALL_ARGS_BLOCKARG != 0 {
+                if flags.is_block_arg() {
                     gen_counter_incr!(asm, send_block_arg);
                     return CantCompile;
                 }
@@ -6203,11 +6204,11 @@ fn gen_send_general(
                 );
             }
             VM_METHOD_TYPE_ATTRSET => {
-                if flags & VM_CALL_ARGS_SPLAT != 0 {
+                if flags.is_splat() {
                     gen_counter_incr!(asm, send_args_splat_attrset);
                     return CantCompile;
                 }
-                if flags & VM_CALL_KWARG != 0 {
+                if flags.is_kw_arg() {
                     gen_counter_incr!(asm, send_attrset_kwargs);
                     return CantCompile;
                 } else if argc != 1 || unsafe { !RB_TYPE_P(comptime_recv, RUBY_T_OBJECT) } {
@@ -6218,7 +6219,7 @@ fn gen_send_general(
                     // See :attr-tracing:
                     gen_counter_incr!(asm, send_cfunc_tracing);
                     return CantCompile;
-                } else if flags & VM_CALL_ARGS_BLOCKARG != 0 {
+                } else if flags.is_block_arg() {
                     gen_counter_incr!(asm, send_block_arg);
                     return CantCompile;
                 } else {
@@ -6228,7 +6229,7 @@ fn gen_send_general(
             }
             // Block method, e.g. define_method(:foo) { :my_block }
             VM_METHOD_TYPE_BMETHOD => {
-                if flags & VM_CALL_ARGS_SPLAT != 0 {
+                if flags.is_splat() {
                     gen_counter_incr!(asm, send_args_splat_bmethod);
                     return CantCompile;
                 }
@@ -6241,7 +6242,7 @@ fn gen_send_general(
             }
             // Send family of methods, e.g. call/apply
             VM_METHOD_TYPE_OPTIMIZED => {
-                if flags & VM_CALL_ARGS_BLOCKARG != 0 {
+                if flags.is_block_arg() {
                     gen_counter_incr!(asm, send_block_arg);
                     return CantCompile;
                 }
@@ -6261,7 +6262,7 @@ fn gen_send_general(
                         // many levels deep we need to stack manipulate. Because of how exits
                         // currently work, we can't do stack manipulation until we will no longer
                         // side exit.
-                        if flags & VM_CALL_OPT_SEND != 0 {
+                        if flags.is_opt_send() {
                             gen_counter_incr!(asm, send_send_nested);
                             return CantCompile;
                         }
@@ -6356,12 +6357,12 @@ fn gen_send_general(
                             return CantCompile;
                         }
 
-                        if flags & VM_CALL_KWARG != 0 {
+                        if flags.is_kw_arg() {
                             gen_counter_incr!(asm, send_call_kwarg);
                             return CantCompile;
                         }
 
-                        if flags & VM_CALL_ARGS_SPLAT != 0 {
+                        if flags.is_splat() {
                             gen_counter_incr!(asm, send_args_splat_opt_call);
                             return CantCompile;
                         }
@@ -6374,7 +6375,7 @@ fn gen_send_general(
                         }
 
                         // If this is a .send call we need to adjust the stack
-                        if flags & VM_CALL_OPT_SEND != 0 {
+                        if flags.is_opt_send() {
                             handle_opt_send_shift_stack(asm, argc, ctx);
                         }
 
@@ -6410,7 +6411,7 @@ fn gen_send_general(
                         return CantCompile;
                     }
                     OPTIMIZED_METHOD_TYPE_STRUCT_AREF => {
-                        if flags & VM_CALL_ARGS_SPLAT != 0 {
+                        if flags.is_splat() {
                             gen_counter_incr!(asm, send_args_splat_aref);
                             return CantCompile;
                         }
@@ -6427,7 +6428,7 @@ fn gen_send_general(
                         );
                     }
                     OPTIMIZED_METHOD_TYPE_STRUCT_ASET => {
-                        if flags & VM_CALL_ARGS_SPLAT != 0 {
+                        if flags.is_splat() {
                             gen_counter_incr!(asm, send_args_splat_aset);
                             return CantCompile;
                         }
@@ -6538,7 +6539,7 @@ fn gen_invokeblock(
     let cd = jit.get_arg(0).as_ptr();
     let ci = unsafe { get_call_data_ci(cd) };
     let argc: i32 = unsafe { vm_ci_argc(ci) }.try_into().unwrap();
-    let flags = unsafe { vm_ci_flag(ci) };
+    let flags = CallFlags::from_ci(ci);
 
     // Get block_handler
     let cfp = unsafe { get_ec_cfp(jit.ec.unwrap()) };
@@ -6606,11 +6607,11 @@ fn gen_invokeblock(
         )
     } else if comptime_handler.0 & 0x3 == 0x3 { // VM_BH_IFUNC_P
         // We aren't handling CALLER_SETUP_ARG and CALLER_REMOVE_EMPTY_KW_SPLAT yet.
-        if flags & VM_CALL_ARGS_SPLAT != 0 {
+        if flags.is_splat() {
             gen_counter_incr!(asm, invokeblock_ifunc_args_splat);
             return CantCompile;
         }
-        if flags & VM_CALL_KW_SPLAT != 0 {
+        if flags.is_kw_splat() {
             gen_counter_incr!(asm, invokeblock_ifunc_kw_splat);
             return CantCompile;
         }
@@ -6713,20 +6714,20 @@ fn gen_invokesuper(
     let ci = unsafe { get_call_data_ci(cd) };
     let argc: i32 = unsafe { vm_ci_argc(ci) }.try_into().unwrap();
 
-    let ci_flags = unsafe { vm_ci_flag(ci) };
+    let ci_flags = CallFlags::from_ci(ci);
 
     // Don't JIT calls that aren't simple
     // Note, not using VM_CALL_ARGS_SIMPLE because sometimes we pass a block.
 
-    if ci_flags & VM_CALL_KWARG != 0 {
+    if ci_flags.is_kw_arg() {
         gen_counter_incr!(asm, send_keywords);
         return CantCompile;
     }
-    if ci_flags & VM_CALL_KW_SPLAT != 0 {
+    if ci_flags.is_kw_splat() {
         gen_counter_incr!(asm, send_kw_splat);
         return CantCompile;
     }
-    if ci_flags & VM_CALL_ARGS_BLOCKARG != 0 {
+    if ci_flags.is_block_arg() {
         gen_counter_incr!(asm, send_block_arg);
         return CantCompile;
     }
