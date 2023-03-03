@@ -8,7 +8,7 @@
 ///
 pub struct Breakpoint {
     /// The value to be captured by ESR_ELx.ISS
-    imm16: u16
+    imm16: u16,
 }
 
 impl Breakpoint {
@@ -27,11 +27,7 @@ impl From<Breakpoint> for u32 {
     fn from(inst: Breakpoint) -> Self {
         let imm16 = inst.imm16 as u32;
 
-        0
-        | (0b11 << 30)
-        | (FAMILY << 26)
-        | (1 << 21)
-        | (imm16 << 5)
+        (0b11 << 30) | (FAMILY << 26) | (1 << 21) | (imm16 << 5)
     }
 }
 

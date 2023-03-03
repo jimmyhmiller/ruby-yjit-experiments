@@ -102,9 +102,9 @@ pub fn assume_bop_not_redefined(
             .or_default()
             .insert((klass, bop));
 
-        return true;
+        true
     } else {
-        return false;
+        false
     }
 }
 
@@ -140,8 +140,8 @@ pub fn assume_method_basic_definition(
     jit: &mut JITState,
     ocb: &mut OutlinedCb,
     klass: VALUE,
-    mid: ID
-    ) -> bool {
+    mid: ID,
+) -> bool {
     if unsafe { rb_method_basic_definition_p(klass, mid) } != 0 {
         let cme = unsafe { rb_callable_method_entry(klass, mid) };
         assume_method_lookup_stable(jit, ocb, cme);
@@ -172,10 +172,7 @@ pub fn assume_single_ractor_mode(jit: &mut JITState, ocb: &mut OutlinedCb) -> bo
 pub fn assume_stable_constant_names(jit: &mut JITState, ocb: &mut OutlinedCb, idlist: *const ID) {
     /// Tracks that a block is assuming that the name component of a constant
     /// has not changed since the last call to this function.
-    fn assume_stable_constant_name(
-        jit: &mut JITState,
-        id: ID,
-    ) {
+    fn assume_stable_constant_name(jit: &mut JITState, id: ID) {
         if id == idNULL as u64 {
             // Used for :: prefix
             return;
@@ -194,7 +191,6 @@ pub fn assume_stable_constant_names(jit: &mut JITState, ocb: &mut OutlinedCb, id
             .insert(id);
     }
 
-
     for i in 0.. {
         match unsafe { *idlist.offset(i) } {
             0 => break, // End of NULL terminated list
@@ -203,7 +199,6 @@ pub fn assume_stable_constant_names(jit: &mut JITState, ocb: &mut OutlinedCb, id
     }
 
     jit_ensure_block_entry_exit(jit, ocb);
-
 }
 
 /// Called when a basic operator is redefined. Note that all the blocks assuming
@@ -289,7 +284,7 @@ pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
                 .keys()
                 .for_each(|id| {
                     if let Some(blocks) =
-                        Invariants::get_instance().constant_state_blocks.remove(&id)
+                        Invariants::get_instance().constant_state_blocks.remove(id)
                     {
                         for block in &blocks {
                             invalidate_block_version(block);
@@ -367,12 +362,12 @@ pub fn block_assumptions_free(blockref: &BlockRef) {
 
     // Remove tracking for basic operators that the given block assumes have
     // not been redefined.
-    if let Some(bops) = invariants.block_basic_operators.remove(&blockref) {
+    if let Some(bops) = invariants.block_basic_operators.remove(blockref) {
         // Remove tracking for the given block from the list of blocks associated
         // with the given basic operator.
         for key in &bops {
             if let Some(blocks) = invariants.basic_operator_blocks.get_mut(key) {
-                blocks.remove(&blockref);
+                blocks.remove(blockref);
                 if blocks.is_empty() {
                     invariants.basic_operator_blocks.remove(key);
                 }
@@ -387,16 +382,16 @@ pub fn block_assumptions_free(blockref: &BlockRef) {
     }
 
     // Remove tracking for blocks assuming single ractor mode
-    invariants.single_ractor.remove(&blockref);
+    invariants.single_ractor.remove(blockref);
     if invariants.single_ractor.is_empty() {
         invariants.single_ractor.shrink_to_fit();
     }
 
     // Remove tracking for constant state for a given ID.
-    if let Some(ids) = invariants.block_constant_states.remove(&blockref) {
+    if let Some(ids) = invariants.block_constant_states.remove(blockref) {
         for id in ids {
             if let Some(blocks) = invariants.constant_state_blocks.get_mut(&id) {
-                blocks.remove(&blockref);
+                blocks.remove(blockref);
                 if blocks.is_empty() {
                     invariants.constant_state_blocks.remove(&id);
                 }
@@ -533,7 +528,10 @@ pub extern "C" fn rb_yjit_tracing_invalidate_all() {
         patches.sort_by_cached_key(|patch| patch.inline_patch_pos.raw_ptr());
         let mut last_patch_end = std::ptr::null();
         for patch in &patches {
-            assert!(last_patch_end <= patch.inline_patch_pos.raw_ptr(), "patches should not overlap");
+            assert!(
+                last_patch_end <= patch.inline_patch_pos.raw_ptr(),
+                "patches should not overlap"
+            );
 
             let mut asm = crate::backend::ir::Assembler::new();
             asm.jmp(patch.outlined_target_pos.as_side_exit());

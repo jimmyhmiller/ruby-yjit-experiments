@@ -15,15 +15,27 @@ pub use opnd::*;
 
 /// Checks that a signed value fits within the specified number of bits.
 pub const fn imm_fits_bits(imm: i64, num_bits: u8) -> bool {
-    let minimum = if num_bits == 64 { i64::MIN } else { -(2_i64.pow((num_bits as u32) - 1)) };
-    let maximum = if num_bits == 64 { i64::MAX } else { 2_i64.pow((num_bits as u32) - 1) - 1 };
+    let minimum = if num_bits == 64 {
+        i64::MIN
+    } else {
+        -(2_i64.pow((num_bits as u32) - 1))
+    };
+    let maximum = if num_bits == 64 {
+        i64::MAX
+    } else {
+        2_i64.pow((num_bits as u32) - 1) - 1
+    };
 
     imm >= minimum && imm <= maximum
 }
 
 /// Checks that an unsigned value fits within the specified number of bits.
 pub const fn uimm_fits_bits(uimm: u64, num_bits: u8) -> bool {
-    let maximum = if num_bits == 64 { u64::MAX } else { 2_u64.pow(num_bits as u32) - 1 };
+    let maximum = if num_bits == 64 {
+        u64::MAX
+    } else {
+        2_u64.pow(num_bits as u32) - 1
+    };
 
     uimm <= maximum
 }
@@ -38,21 +50,45 @@ pub fn add(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             DataReg::add(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(uimm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
-            DataImm::add(rd.reg_no, rn.reg_no, uimm12.try_into().unwrap(), rd.num_bits).into()
-        },
+            DataImm::add(
+                rd.reg_no,
+                rn.reg_no,
+                uimm12.try_into().unwrap(),
+                rd.num_bits,
+            )
+            .into()
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::Imm(imm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
             if imm12 < 0 {
-                DataImm::sub(rd.reg_no, rn.reg_no, (-imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::sub(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (-imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             } else {
-                DataImm::add(rd.reg_no, rn.reg_no, (imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::add(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             }
-        },
+        }
         _ => panic!("Invalid operand combination to add instruction."),
     };
 
@@ -69,21 +105,39 @@ pub fn adds(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             DataReg::adds(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(imm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
             DataImm::adds(rd.reg_no, rn.reg_no, imm12.try_into().unwrap(), rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::Imm(imm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
             if imm12 < 0 {
-                DataImm::subs(rd.reg_no, rn.reg_no, (-imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::subs(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (-imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             } else {
-                DataImm::adds(rd.reg_no, rn.reg_no, (imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::adds(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             }
-        },
+        }
         _ => panic!("Invalid operand combination to adds instruction."),
     };
 
@@ -94,11 +148,17 @@ pub fn adds(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
 pub fn adr(cb: &mut CodeBlock, rd: A64Opnd, imm: A64Opnd) {
     let bytes: [u8; 4] = match (rd, imm) {
         (A64Opnd::Reg(rd), A64Opnd::Imm(imm)) => {
-            assert!(rd.num_bits == 64, "The destination register must be 64 bits.");
-            assert!(imm_fits_bits(imm, 21), "The immediate operand must be 21 bits or less.");
+            assert!(
+                rd.num_bits == 64,
+                "The destination register must be 64 bits."
+            );
+            assert!(
+                imm_fits_bits(imm, 21),
+                "The immediate operand must be 21 bits or less."
+            );
 
             PCRelative::adr(rd.reg_no, imm as i32).into()
-        },
+        }
         _ => panic!("Invalid operand combination to adr instruction."),
     };
 
@@ -111,11 +171,17 @@ pub fn adr(cb: &mut CodeBlock, rd: A64Opnd, imm: A64Opnd) {
 pub fn adrp(cb: &mut CodeBlock, rd: A64Opnd, imm: A64Opnd) {
     let bytes: [u8; 4] = match (rd, imm) {
         (A64Opnd::Reg(rd), A64Opnd::Imm(imm)) => {
-            assert!(rd.num_bits == 64, "The destination register must be 64 bits.");
-            assert!(imm_fits_bits(imm, 32), "The immediate operand must be 32 bits or less.");
+            assert!(
+                rd.num_bits == 64,
+                "The destination register must be 64 bits."
+            );
+            assert!(
+                imm_fits_bits(imm, 32),
+                "The immediate operand must be 32 bits or less."
+            );
 
             PCRelative::adrp(rd.reg_no, imm as i32).into()
-        },
+        }
         _ => panic!("Invalid operand combination to adr instruction."),
     };
 
@@ -132,17 +198,21 @@ pub fn and(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             LogicalReg::and(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(imm)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
             let bitmask_imm = if rd.num_bits == 32 {
                 BitmaskImmediate::new_32b_reg(imm.try_into().unwrap())
             } else {
                 imm.try_into()
-            }.unwrap();
+            }
+            .unwrap();
 
             LogicalImm::and(rd.reg_no, rn.reg_no, bitmask_imm, rd.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to and instruction."),
     };
 
@@ -159,17 +229,21 @@ pub fn ands(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             LogicalReg::ands(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(imm)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
             let bitmask_imm = if rd.num_bits == 32 {
                 BitmaskImmediate::new_32b_reg(imm.try_into().unwrap())
             } else {
                 imm.try_into()
-            }.unwrap();
+            }
+            .unwrap();
 
             LogicalImm::ands(rd.reg_no, rn.reg_no, bitmask_imm, rd.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to ands instruction."),
     };
 
@@ -181,11 +255,17 @@ pub fn ands(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
 pub fn asr(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, shift: A64Opnd) {
     let bytes: [u8; 4] = match (rd, rn, shift) {
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(shift)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
-            assert!(uimm_fits_bits(shift, 6), "The shift operand must be 6 bits or less.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
+            assert!(
+                uimm_fits_bits(shift, 6),
+                "The shift operand must be 6 bits or less."
+            );
 
             SBFM::asr(rd.reg_no, rn.reg_no, shift.try_into().unwrap(), rd.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to asr instruction."),
     };
 
@@ -201,7 +281,10 @@ pub const fn b_offset_fits_bits(offset: i64) -> bool {
 
 /// B - branch without link (offset is number of instructions to jump)
 pub fn b(cb: &mut CodeBlock, offset: InstructionOffset) {
-    assert!(b_offset_fits_bits(offset.into()), "The immediate operand must be 26 bits or less.");
+    assert!(
+        b_offset_fits_bits(offset.into()),
+        "The immediate operand must be 26 bits or less."
+    );
     let bytes: [u8; 4] = Call::b(offset).into();
 
     cb.write_bytes(&bytes);
@@ -217,7 +300,10 @@ pub const fn bcond_offset_fits_bits(offset: i64) -> bool {
 
 /// B.cond - branch to target if condition is true
 pub fn bcond(cb: &mut CodeBlock, cond: u8, offset: InstructionOffset) {
-    assert!(bcond_offset_fits_bits(offset.into()), "The offset must be 19 bits or less.");
+    assert!(
+        bcond_offset_fits_bits(offset.into()),
+        "The offset must be 19 bits or less."
+    );
     let bytes: [u8; 4] = BranchCond::bcond(cond, offset).into();
 
     cb.write_bytes(&bytes);
@@ -225,7 +311,10 @@ pub fn bcond(cb: &mut CodeBlock, cond: u8, offset: InstructionOffset) {
 
 /// BL - branch with link (offset is number of instructions to jump)
 pub fn bl(cb: &mut CodeBlock, offset: InstructionOffset) {
-    assert!(b_offset_fits_bits(offset.into()), "The offset must be 26 bits or less.");
+    assert!(
+        b_offset_fits_bits(offset.into()),
+        "The offset must be 26 bits or less."
+    );
     let bytes: [u8; 4] = Call::bl(offset).into();
 
     cb.write_bytes(&bytes);
@@ -256,10 +345,13 @@ pub fn brk(cb: &mut CodeBlock, imm16: A64Opnd) {
     let bytes: [u8; 4] = match imm16 {
         A64Opnd::None => Breakpoint::brk(0).into(),
         A64Opnd::UImm(imm16) => {
-            assert!(uimm_fits_bits(imm16, 16), "The immediate operand must be 16 bits or less.");
+            assert!(
+                uimm_fits_bits(imm16, 16),
+                "The immediate operand must be 16 bits or less."
+            );
             Breakpoint::brk(imm16 as u16).into()
-        },
-        _ => panic!("Invalid operand combination to brk instruction.")
+        }
+        _ => panic!("Invalid operand combination to brk instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -275,10 +367,10 @@ pub fn cmp(cb: &mut CodeBlock, rn: A64Opnd, rm: A64Opnd) {
             );
 
             DataReg::cmp(rn.reg_no, rm.reg_no, rn.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rn), A64Opnd::UImm(imm12)) => {
             DataImm::cmp(rn.reg_no, imm12.try_into().unwrap(), rn.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to cmp instruction."),
     };
 
@@ -295,7 +387,7 @@ pub fn csel(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd, cond: u8)
             );
 
             Conditional::csel(rd.reg_no, rn.reg_no, rm.reg_no, cond, rd.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to csel instruction."),
     };
 
@@ -312,17 +404,21 @@ pub fn eor(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             LogicalReg::eor(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(imm)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
             let bitmask_imm = if rd.num_bits == 32 {
                 BitmaskImmediate::new_32b_reg(imm.try_into().unwrap())
             } else {
                 imm.try_into()
-            }.unwrap();
+            }
+            .unwrap();
 
             LogicalImm::eor(rd.reg_no, rn.reg_no, bitmask_imm, rd.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to eor instruction."),
     };
 
@@ -339,7 +435,7 @@ pub fn ldaddal(cb: &mut CodeBlock, rs: A64Opnd, rt: A64Opnd, rn: A64Opnd) {
             );
 
             Atomic::ldaddal(rs.reg_no, rt.reg_no, rn.reg_no, rs.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to ldaddal instruction."),
     };
 
@@ -353,7 +449,7 @@ pub fn ldaxr(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
             assert_eq!(rn.num_bits, 64, "rn must be a 64-bit register.");
 
             LoadStoreExclusive::ldaxr(rt.reg_no, rn.reg_no, rt.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to ldaxr instruction."),
     };
 
@@ -364,13 +460,29 @@ pub fn ldaxr(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn ldp(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt1, rt2, rn) {
         (A64Opnd::Reg(rt1), A64Opnd::Reg(rt2), A64Opnd::Mem(rn)) => {
-            assert!(rt1.num_bits == rt2.num_bits, "Expected source registers to be the same size");
-            assert!(imm_fits_bits(rn.disp.into(), 10), "The displacement must be 10 bits or less.");
-            assert_ne!(rt1.reg_no, rt2.reg_no, "Behavior is unpredictable with pairs of the same register");
+            assert!(
+                rt1.num_bits == rt2.num_bits,
+                "Expected source registers to be the same size"
+            );
+            assert!(
+                imm_fits_bits(rn.disp.into(), 10),
+                "The displacement must be 10 bits or less."
+            );
+            assert_ne!(
+                rt1.reg_no, rt2.reg_no,
+                "Behavior is unpredictable with pairs of the same register"
+            );
 
-            RegisterPair::ldp(rt1.reg_no, rt2.reg_no, rn.base_reg_no, rn.disp as i16, rt1.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to ldp instruction.")
+            RegisterPair::ldp(
+                rt1.reg_no,
+                rt2.reg_no,
+                rn.base_reg_no,
+                rn.disp as i16,
+                rt1.num_bits,
+            )
+            .into()
+        }
+        _ => panic!("Invalid operand combination to ldp instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -380,13 +492,29 @@ pub fn ldp(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
 pub fn ldp_pre(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt1, rt2, rn) {
         (A64Opnd::Reg(rt1), A64Opnd::Reg(rt2), A64Opnd::Mem(rn)) => {
-            assert!(rt1.num_bits == rt2.num_bits, "Expected source registers to be the same size");
-            assert!(imm_fits_bits(rn.disp.into(), 10), "The displacement must be 10 bits or less.");
-            assert_ne!(rt1.reg_no, rt2.reg_no, "Behavior is unpredictable with pairs of the same register");
+            assert!(
+                rt1.num_bits == rt2.num_bits,
+                "Expected source registers to be the same size"
+            );
+            assert!(
+                imm_fits_bits(rn.disp.into(), 10),
+                "The displacement must be 10 bits or less."
+            );
+            assert_ne!(
+                rt1.reg_no, rt2.reg_no,
+                "Behavior is unpredictable with pairs of the same register"
+            );
 
-            RegisterPair::ldp_pre(rt1.reg_no, rt2.reg_no, rn.base_reg_no, rn.disp as i16, rt1.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to ldp instruction.")
+            RegisterPair::ldp_pre(
+                rt1.reg_no,
+                rt2.reg_no,
+                rn.base_reg_no,
+                rn.disp as i16,
+                rt1.num_bits,
+            )
+            .into()
+        }
+        _ => panic!("Invalid operand combination to ldp instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -396,13 +524,29 @@ pub fn ldp_pre(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
 pub fn ldp_post(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt1, rt2, rn) {
         (A64Opnd::Reg(rt1), A64Opnd::Reg(rt2), A64Opnd::Mem(rn)) => {
-            assert!(rt1.num_bits == rt2.num_bits, "Expected source registers to be the same size");
-            assert!(imm_fits_bits(rn.disp.into(), 10), "The displacement must be 10 bits or less.");
-            assert_ne!(rt1.reg_no, rt2.reg_no, "Behavior is unpredictable with pairs of the same register");
+            assert!(
+                rt1.num_bits == rt2.num_bits,
+                "Expected source registers to be the same size"
+            );
+            assert!(
+                imm_fits_bits(rn.disp.into(), 10),
+                "The displacement must be 10 bits or less."
+            );
+            assert_ne!(
+                rt1.reg_no, rt2.reg_no,
+                "Behavior is unpredictable with pairs of the same register"
+            );
 
-            RegisterPair::ldp_post(rt1.reg_no, rt2.reg_no, rn.base_reg_no, rn.disp as i16, rt1.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to ldp instruction.")
+            RegisterPair::ldp_post(
+                rt1.reg_no,
+                rt2.reg_no,
+                rn.base_reg_no,
+                rn.disp as i16,
+                rt1.num_bits,
+            )
+            .into()
+        }
+        _ => panic!("Invalid operand combination to ldp instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -412,12 +556,18 @@ pub fn ldp_post(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
 pub fn ldr(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn, rm) {
         (A64Opnd::Reg(rt), A64Opnd::Reg(rn), A64Opnd::Reg(rm)) => {
-            assert!(rt.num_bits == rn.num_bits, "Expected registers to be the same size");
-            assert!(rn.num_bits == rm.num_bits, "Expected registers to be the same size");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "Expected registers to be the same size"
+            );
+            assert!(
+                rn.num_bits == rm.num_bits,
+                "Expected registers to be the same size"
+            );
 
             LoadRegister::ldr(rt.reg_no, rn.reg_no, rm.reg_no, rt.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to ldr instruction.")
+        }
+        _ => panic!("Invalid operand combination to ldr instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -426,9 +576,7 @@ pub fn ldr(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
 /// LDR - load a PC-relative memory address into a register
 pub fn ldr_literal(cb: &mut CodeBlock, rt: A64Opnd, rn: InstructionOffset) {
     let bytes: [u8; 4] = match rt {
-        A64Opnd::Reg(rt) => {
-            LoadLiteral::ldr_literal(rt.reg_no, rn, rt.num_bits).into()
-        },
+        A64Opnd::Reg(rt) => LoadLiteral::ldr_literal(rt.reg_no, rn, rt.num_bits).into(),
         _ => panic!("Invalid operand combination to ldr instruction."),
     };
 
@@ -440,11 +588,14 @@ pub fn ldrh(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert_eq!(rt.num_bits, 32, "Expected to be loading a halfword");
-            assert!(imm_fits_bits(rn.disp.into(), 12), "The displacement must be 12 bits or less.");
+            assert!(
+                imm_fits_bits(rn.disp.into(), 12),
+                "The displacement must be 12 bits or less."
+            );
 
             HalfwordImm::ldrh(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to ldrh instruction.")
+        }
+        _ => panic!("Invalid operand combination to ldrh instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -455,11 +606,14 @@ pub fn ldrh_pre(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert_eq!(rt.num_bits, 32, "Expected to be loading a halfword");
-            assert!(imm_fits_bits(rn.disp.into(), 9), "The displacement must be 9 bits or less.");
+            assert!(
+                imm_fits_bits(rn.disp.into(), 9),
+                "The displacement must be 9 bits or less."
+            );
 
             HalfwordImm::ldrh_pre(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to ldrh instruction.")
+        }
+        _ => panic!("Invalid operand combination to ldrh instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -470,11 +624,14 @@ pub fn ldrh_post(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert_eq!(rt.num_bits, 32, "Expected to be loading a halfword");
-            assert!(imm_fits_bits(rn.disp.into(), 9), "The displacement must be 9 bits or less.");
+            assert!(
+                imm_fits_bits(rn.disp.into(), 9),
+                "The displacement must be 9 bits or less."
+            );
 
             HalfwordImm::ldrh_post(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to ldrh instruction.")
+        }
+        _ => panic!("Invalid operand combination to ldrh instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -490,11 +647,17 @@ pub fn mem_disp_fits_bits(disp: i32) -> bool {
 pub fn ldr_post(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "All operands must be of the same size.");
-            assert!(mem_disp_fits_bits(rn.disp), "The displacement must be 9 bits or less.");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "All operands must be of the same size."
+            );
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "The displacement must be 9 bits or less."
+            );
 
             LoadStore::ldr_post(rt.reg_no, rn.base_reg_no, rn.disp as i16, rt.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to ldr instruction."),
     };
 
@@ -505,11 +668,17 @@ pub fn ldr_post(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn ldr_pre(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "All operands must be of the same size.");
-            assert!(mem_disp_fits_bits(rn.disp), "The displacement must be 9 bits or less.");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "All operands must be of the same size."
+            );
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "The displacement must be 9 bits or less."
+            );
 
             LoadStore::ldr_pre(rt.reg_no, rn.base_reg_no, rn.disp as i16, rt.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to ldr instruction."),
     };
 
@@ -520,17 +689,26 @@ pub fn ldr_pre(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn ldur(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Reg(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "All operands must be of the same size.");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "All operands must be of the same size."
+            );
 
             LoadStore::ldur(rt.reg_no, rn.reg_no, 0, rt.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "Expected registers to be the same size");
-            assert!(mem_disp_fits_bits(rn.disp), "Expected displacement to be 9 bits or less");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "Expected registers to be the same size"
+            );
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "Expected displacement to be 9 bits or less"
+            );
 
             LoadStore::ldur(rt.reg_no, rn.base_reg_no, rn.disp as i16, rt.num_bits).into()
-        },
-        _ => panic!("Invalid operands for LDUR")
+        }
+        _ => panic!("Invalid operands for LDUR"),
     };
 
     cb.write_bytes(&bytes);
@@ -540,11 +718,14 @@ pub fn ldur(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn ldurh(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(mem_disp_fits_bits(rn.disp), "Expected displacement to be 9 bits or less");
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "Expected displacement to be 9 bits or less"
+            );
 
             LoadStore::ldurh(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operands for LDURH")
+        }
+        _ => panic!("Invalid operands for LDURH"),
     };
 
     cb.write_bytes(&bytes);
@@ -554,13 +735,19 @@ pub fn ldurh(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn ldurb(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "Expected registers to be the same size");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "Expected registers to be the same size"
+            );
             assert!(rt.num_bits == 8, "Expected registers to have size 8");
-            assert!(mem_disp_fits_bits(rn.disp), "Expected displacement to be 9 bits or less");
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "Expected displacement to be 9 bits or less"
+            );
 
             LoadStore::ldurb(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operands for LDURB")
+        }
+        _ => panic!("Invalid operands for LDURB"),
     };
 
     cb.write_bytes(&bytes);
@@ -570,12 +757,18 @@ pub fn ldurb(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn ldursw(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "Expected registers to be the same size");
-            assert!(mem_disp_fits_bits(rn.disp), "Expected displacement to be 9 bits or less");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "Expected registers to be the same size"
+            );
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "Expected displacement to be 9 bits or less"
+            );
 
             LoadStore::ldursw(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to ldursw instruction.")
+        }
+        _ => panic!("Invalid operand combination to ldursw instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -585,12 +778,18 @@ pub fn ldursw(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn lsl(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, shift: A64Opnd) {
     let bytes: [u8; 4] = match (rd, rn, shift) {
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(uimm)) => {
-            assert!(rd.num_bits == rn.num_bits, "Expected registers to be the same size");
-            assert!(uimm_fits_bits(uimm, 6), "Expected shift to be 6 bits or less");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "Expected registers to be the same size"
+            );
+            assert!(
+                uimm_fits_bits(uimm, 6),
+                "Expected shift to be 6 bits or less"
+            );
 
             ShiftImm::lsl(rd.reg_no, rn.reg_no, uimm as u8, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operands combination to lsl instruction")
+        }
+        _ => panic!("Invalid operands combination to lsl instruction"),
     };
 
     cb.write_bytes(&bytes);
@@ -600,12 +799,18 @@ pub fn lsl(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, shift: A64Opnd) {
 pub fn lsr(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, shift: A64Opnd) {
     let bytes: [u8; 4] = match (rd, rn, shift) {
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(uimm)) => {
-            assert!(rd.num_bits == rn.num_bits, "Expected registers to be the same size");
-            assert!(uimm_fits_bits(uimm, 6), "Expected shift to be 6 bits or less");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "Expected registers to be the same size"
+            );
+            assert!(
+                uimm_fits_bits(uimm, 6),
+                "Expected shift to be 6 bits or less"
+            );
 
             ShiftImm::lsr(rd.reg_no, rn.reg_no, uimm as u8, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operands combination to lsr instruction")
+        }
+        _ => panic!("Invalid operands combination to lsr instruction"),
     };
 
     cb.write_bytes(&bytes);
@@ -614,34 +819,50 @@ pub fn lsr(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, shift: A64Opnd) {
 /// MOV - move a value in a register to another register
 pub fn mov(cb: &mut CodeBlock, rd: A64Opnd, rm: A64Opnd) {
     let bytes: [u8; 4] = match (rd, rm) {
-        (A64Opnd::Reg(A64Reg { reg_no: 31, num_bits: 64 }), A64Opnd::Reg(rm)) => {
+        (
+            A64Opnd::Reg(A64Reg {
+                reg_no: 31,
+                num_bits: 64,
+            }),
+            A64Opnd::Reg(rm),
+        ) => {
             assert!(rm.num_bits == 64, "Expected rm to be 64 bits");
 
             DataImm::add(31, rm.reg_no, 0.try_into().unwrap(), 64).into()
-        },
-        (A64Opnd::Reg(rd), A64Opnd::Reg(A64Reg { reg_no: 31, num_bits: 64 })) => {
+        }
+        (
+            A64Opnd::Reg(rd),
+            A64Opnd::Reg(A64Reg {
+                reg_no: 31,
+                num_bits: 64,
+            }),
+        ) => {
             assert!(rd.num_bits == 64, "Expected rd to be 64 bits");
 
             DataImm::add(rd.reg_no, 31, 0.try_into().unwrap(), 64).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rm)) => {
-            assert!(rd.num_bits == rm.num_bits, "Expected registers to be the same size");
+            assert!(
+                rd.num_bits == rm.num_bits,
+                "Expected registers to be the same size"
+            );
 
             LogicalReg::mov(rd.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::UImm(0)) => {
             LogicalReg::mov(rd.reg_no, XZR_REG.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::UImm(imm)) => {
             let bitmask_imm = if rd.num_bits == 32 {
                 BitmaskImmediate::new_32b_reg(imm.try_into().unwrap())
             } else {
                 imm.try_into()
-            }.unwrap();
+            }
+            .unwrap();
 
             LogicalImm::mov(rd.reg_no, bitmask_imm, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to mov instruction")
+        }
+        _ => panic!("Invalid operand combination to mov instruction"),
     };
 
     cb.write_bytes(&bytes);
@@ -651,11 +872,14 @@ pub fn mov(cb: &mut CodeBlock, rd: A64Opnd, rm: A64Opnd) {
 pub fn movk(cb: &mut CodeBlock, rd: A64Opnd, imm16: A64Opnd, shift: u8) {
     let bytes: [u8; 4] = match (rd, imm16) {
         (A64Opnd::Reg(rd), A64Opnd::UImm(imm16)) => {
-            assert!(uimm_fits_bits(imm16, 16), "The immediate operand must be 16 bits or less.");
+            assert!(
+                uimm_fits_bits(imm16, 16),
+                "The immediate operand must be 16 bits or less."
+            );
 
             Mov::movk(rd.reg_no, imm16 as u16, shift, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to movk instruction.")
+        }
+        _ => panic!("Invalid operand combination to movk instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -665,11 +889,14 @@ pub fn movk(cb: &mut CodeBlock, rd: A64Opnd, imm16: A64Opnd, shift: u8) {
 pub fn movz(cb: &mut CodeBlock, rd: A64Opnd, imm16: A64Opnd, shift: u8) {
     let bytes: [u8; 4] = match (rd, imm16) {
         (A64Opnd::Reg(rd), A64Opnd::UImm(imm16)) => {
-            assert!(uimm_fits_bits(imm16, 16), "The immediate operand must be 16 bits or less.");
+            assert!(
+                uimm_fits_bits(imm16, 16),
+                "The immediate operand must be 16 bits or less."
+            );
 
             Mov::movz(rd.reg_no, imm16 as u16, shift, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to movz instruction.")
+        }
+        _ => panic!("Invalid operand combination to movz instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -678,10 +905,8 @@ pub fn movz(cb: &mut CodeBlock, rd: A64Opnd, imm16: A64Opnd, shift: u8) {
 /// MRS - move a system register into a general-purpose register
 pub fn mrs(cb: &mut CodeBlock, rt: A64Opnd, systemregister: SystemRegister) {
     let bytes: [u8; 4] = match rt {
-        A64Opnd::Reg(rt) => {
-            SysReg::mrs(rt.reg_no, systemregister).into()
-        },
-        _ => panic!("Invalid operand combination to mrs instruction")
+        A64Opnd::Reg(rt) => SysReg::mrs(rt.reg_no, systemregister).into(),
+        _ => panic!("Invalid operand combination to mrs instruction"),
     };
 
     cb.write_bytes(&bytes);
@@ -690,10 +915,8 @@ pub fn mrs(cb: &mut CodeBlock, rt: A64Opnd, systemregister: SystemRegister) {
 /// MSR - move a general-purpose register into a system register
 pub fn msr(cb: &mut CodeBlock, systemregister: SystemRegister, rt: A64Opnd) {
     let bytes: [u8; 4] = match rt {
-        A64Opnd::Reg(rt) => {
-            SysReg::msr(systemregister, rt.reg_no).into()
-        },
-        _ => panic!("Invalid operand combination to msr instruction")
+        A64Opnd::Reg(rt) => SysReg::msr(systemregister, rt.reg_no).into(),
+        _ => panic!("Invalid operand combination to msr instruction"),
     };
 
     cb.write_bytes(&bytes);
@@ -703,11 +926,14 @@ pub fn msr(cb: &mut CodeBlock, systemregister: SystemRegister, rt: A64Opnd) {
 pub fn mvn(cb: &mut CodeBlock, rd: A64Opnd, rm: A64Opnd) {
     let bytes: [u8; 4] = match (rd, rm) {
         (A64Opnd::Reg(rd), A64Opnd::Reg(rm)) => {
-            assert!(rd.num_bits == rm.num_bits, "Expected registers to be the same size");
+            assert!(
+                rd.num_bits == rm.num_bits,
+                "Expected registers to be the same size"
+            );
 
             LogicalReg::mvn(rd.reg_no, rm.reg_no, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to mvn instruction")
+        }
+        _ => panic!("Invalid operand combination to mvn instruction"),
     };
 
     cb.write_bytes(&bytes);
@@ -724,11 +950,14 @@ pub fn nop(cb: &mut CodeBlock) {
 pub fn orn(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
     let bytes: [u8; 4] = match (rd, rn, rm) {
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::Reg(rm)) => {
-            assert!(rd.num_bits == rn.num_bits && rn.num_bits == rm.num_bits, "Expected registers to be the same size");
+            assert!(
+                rd.num_bits == rn.num_bits && rn.num_bits == rm.num_bits,
+                "Expected registers to be the same size"
+            );
 
             LogicalReg::orn(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to orn instruction.")
+        }
+        _ => panic!("Invalid operand combination to orn instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -744,17 +973,21 @@ pub fn orr(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             LogicalReg::orr(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(imm)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
             let bitmask_imm = if rd.num_bits == 32 {
                 BitmaskImmediate::new_32b_reg(imm.try_into().unwrap())
             } else {
                 imm.try_into()
-            }.unwrap();
+            }
+            .unwrap();
 
             LogicalImm::orr(rd.reg_no, rn.reg_no, bitmask_imm, rd.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to orr instruction."),
     };
 
@@ -769,8 +1002,8 @@ pub fn stlxr(cb: &mut CodeBlock, rs: A64Opnd, rt: A64Opnd, rn: A64Opnd) {
             assert_eq!(rn.num_bits, 64, "rn must be a 64-bit register.");
 
             LoadStoreExclusive::stlxr(rs.reg_no, rt.reg_no, rn.reg_no, rn.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to stlxr instruction.")
+        }
+        _ => panic!("Invalid operand combination to stlxr instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -780,13 +1013,29 @@ pub fn stlxr(cb: &mut CodeBlock, rs: A64Opnd, rt: A64Opnd, rn: A64Opnd) {
 pub fn stp(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt1, rt2, rn) {
         (A64Opnd::Reg(rt1), A64Opnd::Reg(rt2), A64Opnd::Mem(rn)) => {
-            assert!(rt1.num_bits == rt2.num_bits, "Expected source registers to be the same size");
-            assert!(imm_fits_bits(rn.disp.into(), 10), "The displacement must be 10 bits or less.");
-            assert_ne!(rt1.reg_no, rt2.reg_no, "Behavior is unpredictable with pairs of the same register");
+            assert!(
+                rt1.num_bits == rt2.num_bits,
+                "Expected source registers to be the same size"
+            );
+            assert!(
+                imm_fits_bits(rn.disp.into(), 10),
+                "The displacement must be 10 bits or less."
+            );
+            assert_ne!(
+                rt1.reg_no, rt2.reg_no,
+                "Behavior is unpredictable with pairs of the same register"
+            );
 
-            RegisterPair::stp(rt1.reg_no, rt2.reg_no, rn.base_reg_no, rn.disp as i16, rt1.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to stp instruction.")
+            RegisterPair::stp(
+                rt1.reg_no,
+                rt2.reg_no,
+                rn.base_reg_no,
+                rn.disp as i16,
+                rt1.num_bits,
+            )
+            .into()
+        }
+        _ => panic!("Invalid operand combination to stp instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -796,13 +1045,29 @@ pub fn stp(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
 pub fn stp_pre(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt1, rt2, rn) {
         (A64Opnd::Reg(rt1), A64Opnd::Reg(rt2), A64Opnd::Mem(rn)) => {
-            assert!(rt1.num_bits == rt2.num_bits, "Expected source registers to be the same size");
-            assert!(imm_fits_bits(rn.disp.into(), 10), "The displacement must be 10 bits or less.");
-            assert_ne!(rt1.reg_no, rt2.reg_no, "Behavior is unpredictable with pairs of the same register");
+            assert!(
+                rt1.num_bits == rt2.num_bits,
+                "Expected source registers to be the same size"
+            );
+            assert!(
+                imm_fits_bits(rn.disp.into(), 10),
+                "The displacement must be 10 bits or less."
+            );
+            assert_ne!(
+                rt1.reg_no, rt2.reg_no,
+                "Behavior is unpredictable with pairs of the same register"
+            );
 
-            RegisterPair::stp_pre(rt1.reg_no, rt2.reg_no, rn.base_reg_no, rn.disp as i16, rt1.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to stp instruction.")
+            RegisterPair::stp_pre(
+                rt1.reg_no,
+                rt2.reg_no,
+                rn.base_reg_no,
+                rn.disp as i16,
+                rt1.num_bits,
+            )
+            .into()
+        }
+        _ => panic!("Invalid operand combination to stp instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -812,13 +1077,29 @@ pub fn stp_pre(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
 pub fn stp_post(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt1, rt2, rn) {
         (A64Opnd::Reg(rt1), A64Opnd::Reg(rt2), A64Opnd::Mem(rn)) => {
-            assert!(rt1.num_bits == rt2.num_bits, "Expected source registers to be the same size");
-            assert!(imm_fits_bits(rn.disp.into(), 10), "The displacement must be 10 bits or less.");
-            assert_ne!(rt1.reg_no, rt2.reg_no, "Behavior is unpredictable with pairs of the same register");
+            assert!(
+                rt1.num_bits == rt2.num_bits,
+                "Expected source registers to be the same size"
+            );
+            assert!(
+                imm_fits_bits(rn.disp.into(), 10),
+                "The displacement must be 10 bits or less."
+            );
+            assert_ne!(
+                rt1.reg_no, rt2.reg_no,
+                "Behavior is unpredictable with pairs of the same register"
+            );
 
-            RegisterPair::stp_post(rt1.reg_no, rt2.reg_no, rn.base_reg_no, rn.disp as i16, rt1.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to stp instruction.")
+            RegisterPair::stp_post(
+                rt1.reg_no,
+                rt2.reg_no,
+                rn.base_reg_no,
+                rn.disp as i16,
+                rt1.num_bits,
+            )
+            .into()
+        }
+        _ => panic!("Invalid operand combination to stp instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -828,11 +1109,17 @@ pub fn stp_post(cb: &mut CodeBlock, rt1: A64Opnd, rt2: A64Opnd, rn: A64Opnd) {
 pub fn str_post(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "All operands must be of the same size.");
-            assert!(mem_disp_fits_bits(rn.disp), "The displacement must be 9 bits or less.");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "All operands must be of the same size."
+            );
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "The displacement must be 9 bits or less."
+            );
 
             LoadStore::str_post(rt.reg_no, rn.base_reg_no, rn.disp as i16, rt.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to str instruction."),
     };
 
@@ -843,11 +1130,17 @@ pub fn str_post(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
 pub fn str_pre(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
-            assert!(rt.num_bits == rn.num_bits, "All operands must be of the same size.");
-            assert!(mem_disp_fits_bits(rn.disp), "The displacement must be 9 bits or less.");
+            assert!(
+                rt.num_bits == rn.num_bits,
+                "All operands must be of the same size."
+            );
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "The displacement must be 9 bits or less."
+            );
 
             LoadStore::str_pre(rt.reg_no, rn.base_reg_no, rn.disp as i16, rt.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to str instruction."),
     };
 
@@ -859,11 +1152,14 @@ pub fn strh(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert_eq!(rt.num_bits, 32, "Expected to be loading a halfword");
-            assert!(imm_fits_bits(rn.disp.into(), 12), "The displacement must be 12 bits or less.");
+            assert!(
+                imm_fits_bits(rn.disp.into(), 12),
+                "The displacement must be 12 bits or less."
+            );
 
             HalfwordImm::strh(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to strh instruction.")
+        }
+        _ => panic!("Invalid operand combination to strh instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -874,11 +1170,14 @@ pub fn strh_pre(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert_eq!(rt.num_bits, 32, "Expected to be loading a halfword");
-            assert!(imm_fits_bits(rn.disp.into(), 9), "The displacement must be 9 bits or less.");
+            assert!(
+                imm_fits_bits(rn.disp.into(), 9),
+                "The displacement must be 9 bits or less."
+            );
 
             HalfwordImm::strh_pre(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to strh instruction.")
+        }
+        _ => panic!("Invalid operand combination to strh instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -889,11 +1188,14 @@ pub fn strh_post(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert_eq!(rt.num_bits, 32, "Expected to be loading a halfword");
-            assert!(imm_fits_bits(rn.disp.into(), 9), "The displacement must be 9 bits or less.");
+            assert!(
+                imm_fits_bits(rn.disp.into(), 9),
+                "The displacement must be 9 bits or less."
+            );
 
             HalfwordImm::strh_post(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to strh instruction.")
+        }
+        _ => panic!("Invalid operand combination to strh instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -904,11 +1206,14 @@ pub fn stur(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert!(rn.num_bits == 32 || rn.num_bits == 64);
-            assert!(mem_disp_fits_bits(rn.disp), "Expected displacement to be 9 bits or less");
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "Expected displacement to be 9 bits or less"
+            );
 
             LoadStore::stur(rt.reg_no, rn.base_reg_no, rn.disp as i16, rn.num_bits).into()
-        },
-        _ => panic!("Invalid operand combination to stur instruction.")
+        }
+        _ => panic!("Invalid operand combination to stur instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -919,11 +1224,14 @@ pub fn sturh(cb: &mut CodeBlock, rt: A64Opnd, rn: A64Opnd) {
     let bytes: [u8; 4] = match (rt, rn) {
         (A64Opnd::Reg(rt), A64Opnd::Mem(rn)) => {
             assert!(rn.num_bits == 16);
-            assert!(mem_disp_fits_bits(rn.disp), "Expected displacement to be 9 bits or less");
+            assert!(
+                mem_disp_fits_bits(rn.disp),
+                "Expected displacement to be 9 bits or less"
+            );
 
             LoadStore::sturh(rt.reg_no, rn.base_reg_no, rn.disp as i16).into()
-        },
-        _ => panic!("Invalid operand combination to stur instruction.")
+        }
+        _ => panic!("Invalid operand combination to stur instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -939,21 +1247,45 @@ pub fn sub(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             DataReg::sub(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(uimm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
-            DataImm::sub(rd.reg_no, rn.reg_no, uimm12.try_into().unwrap(), rd.num_bits).into()
-        },
+            DataImm::sub(
+                rd.reg_no,
+                rn.reg_no,
+                uimm12.try_into().unwrap(),
+                rd.num_bits,
+            )
+            .into()
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::Imm(imm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
             if imm12 < 0 {
-                DataImm::add(rd.reg_no, rn.reg_no, (-imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::add(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (-imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             } else {
-                DataImm::sub(rd.reg_no, rn.reg_no, (imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::sub(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             }
-        },
+        }
         _ => panic!("Invalid operand combination to sub instruction."),
     };
 
@@ -970,21 +1302,45 @@ pub fn subs(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd, rm: A64Opnd) {
             );
 
             DataReg::subs(rd.reg_no, rn.reg_no, rm.reg_no, rd.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::UImm(uimm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
-            DataImm::subs(rd.reg_no, rn.reg_no, uimm12.try_into().unwrap(), rd.num_bits).into()
-        },
+            DataImm::subs(
+                rd.reg_no,
+                rn.reg_no,
+                uimm12.try_into().unwrap(),
+                rd.num_bits,
+            )
+            .into()
+        }
         (A64Opnd::Reg(rd), A64Opnd::Reg(rn), A64Opnd::Imm(imm12)) => {
-            assert!(rd.num_bits == rn.num_bits, "rd and rn must be of the same size.");
+            assert!(
+                rd.num_bits == rn.num_bits,
+                "rd and rn must be of the same size."
+            );
 
             if imm12 < 0 {
-                DataImm::adds(rd.reg_no, rn.reg_no, (-imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::adds(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (-imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             } else {
-                DataImm::subs(rd.reg_no, rn.reg_no, (imm12 as u64).try_into().unwrap(), rd.num_bits).into()
+                DataImm::subs(
+                    rd.reg_no,
+                    rn.reg_no,
+                    (imm12 as u64).try_into().unwrap(),
+                    rd.num_bits,
+                )
+                .into()
             }
-        },
+        }
         _ => panic!("Invalid operand combination to subs instruction."),
     };
 
@@ -999,7 +1355,7 @@ pub fn sxtw(cb: &mut CodeBlock, rd: A64Opnd, rn: A64Opnd) {
             assert_eq!(rn.num_bits, 32, "rn must be 32-bits wide.");
 
             SBFM::sxtw(rd.reg_no, rn.reg_no).into()
-        },
+        }
         _ => panic!("Invalid operand combination to sxtw instruction."),
     };
 
@@ -1011,7 +1367,7 @@ pub fn ret(cb: &mut CodeBlock, rn: A64Opnd) {
     let bytes: [u8; 4] = match rn {
         A64Opnd::None => Branch::ret(30).into(),
         A64Opnd::Reg(reg) => Branch::ret(reg.reg_no).into(),
-        _ => panic!("Invalid operand to ret instruction.")
+        _ => panic!("Invalid operand to ret instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -1020,10 +1376,13 @@ pub fn ret(cb: &mut CodeBlock, rn: A64Opnd) {
 /// TBNZ - test bit and branch if not zero
 pub fn tbnz(cb: &mut CodeBlock, rt: A64Opnd, bit_num: A64Opnd, offset: A64Opnd) {
     let bytes: [u8; 4] = match (rt, bit_num, offset) {
-        (A64Opnd::Reg(rt), A64Opnd::UImm(bit_num), A64Opnd::Imm(offset)) => {
-            TestBit::tbnz(rt.reg_no, bit_num.try_into().unwrap(), offset.try_into().unwrap()).into()
-        },
-        _ => panic!("Invalid operand combination to tbnz instruction.")
+        (A64Opnd::Reg(rt), A64Opnd::UImm(bit_num), A64Opnd::Imm(offset)) => TestBit::tbnz(
+            rt.reg_no,
+            bit_num.try_into().unwrap(),
+            offset.try_into().unwrap(),
+        )
+        .into(),
+        _ => panic!("Invalid operand combination to tbnz instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -1032,10 +1391,13 @@ pub fn tbnz(cb: &mut CodeBlock, rt: A64Opnd, bit_num: A64Opnd, offset: A64Opnd) 
 /// TBZ - test bit and branch if zero
 pub fn tbz(cb: &mut CodeBlock, rt: A64Opnd, bit_num: A64Opnd, offset: A64Opnd) {
     let bytes: [u8; 4] = match (rt, bit_num, offset) {
-        (A64Opnd::Reg(rt), A64Opnd::UImm(bit_num), A64Opnd::Imm(offset)) => {
-            TestBit::tbz(rt.reg_no, bit_num.try_into().unwrap(), offset.try_into().unwrap()).into()
-        },
-        _ => panic!("Invalid operand combination to tbz instruction.")
+        (A64Opnd::Reg(rt), A64Opnd::UImm(bit_num), A64Opnd::Imm(offset)) => TestBit::tbz(
+            rt.reg_no,
+            bit_num.try_into().unwrap(),
+            offset.try_into().unwrap(),
+        )
+        .into(),
+        _ => panic!("Invalid operand combination to tbz instruction."),
     };
 
     cb.write_bytes(&bytes);
@@ -1045,19 +1407,23 @@ pub fn tbz(cb: &mut CodeBlock, rt: A64Opnd, bit_num: A64Opnd, offset: A64Opnd) {
 pub fn tst(cb: &mut CodeBlock, rn: A64Opnd, rm: A64Opnd) {
     let bytes: [u8; 4] = match (rn, rm) {
         (A64Opnd::Reg(rn), A64Opnd::Reg(rm)) => {
-            assert!(rn.num_bits == rm.num_bits, "All operands must be of the same size.");
+            assert!(
+                rn.num_bits == rm.num_bits,
+                "All operands must be of the same size."
+            );
 
             LogicalReg::tst(rn.reg_no, rm.reg_no, rn.num_bits).into()
-        },
+        }
         (A64Opnd::Reg(rn), A64Opnd::UImm(imm)) => {
             let bitmask_imm = if rn.num_bits == 32 {
                 BitmaskImmediate::new_32b_reg(imm.try_into().unwrap())
             } else {
                 imm.try_into()
-            }.unwrap();
+            }
+            .unwrap();
 
             LogicalImm::tst(rn.reg_no, bitmask_imm, rn.num_bits).into()
-        },
+        }
         _ => panic!("Invalid operand combination to tst instruction."),
     };
 
@@ -1069,7 +1435,10 @@ mod tests {
     use super::*;
 
     /// Check that the bytes for an instruction sequence match a hex string
-    fn check_bytes<R>(bytes: &str, run: R) where R: FnOnce(&mut super::CodeBlock) {
+    fn check_bytes<R>(bytes: &str, run: R)
+    where
+        R: FnOnce(&mut super::CodeBlock),
+    {
         let mut cb = super::CodeBlock::new_dummy(128);
         run(&mut cb);
         assert_eq!(format!("{:x}", cb), bytes);
@@ -1275,7 +1644,9 @@ mod tests {
 
     #[test]
     fn test_eor_32b_immediate() {
-        check_bytes("29040152", |cb| eor(cb, W9, W1, A64Opnd::new_uimm(0x80000001)));
+        check_bytes("29040152", |cb| {
+            eor(cb, W9, W1, A64Opnd::new_uimm(0x80000001))
+        });
     }
 
     #[test]
@@ -1290,17 +1661,23 @@ mod tests {
 
     #[test]
     fn test_ldp() {
-        check_bytes("8a2d4da9", |cb| ldp(cb, X10, X11, A64Opnd::new_mem(64, X12, 208)));
+        check_bytes("8a2d4da9", |cb| {
+            ldp(cb, X10, X11, A64Opnd::new_mem(64, X12, 208))
+        });
     }
 
     #[test]
     fn test_ldp_pre() {
-        check_bytes("8a2dcda9", |cb| ldp_pre(cb, X10, X11, A64Opnd::new_mem(64, X12, 208)));
+        check_bytes("8a2dcda9", |cb| {
+            ldp_pre(cb, X10, X11, A64Opnd::new_mem(64, X12, 208))
+        });
     }
 
     #[test]
     fn test_ldp_post() {
-        check_bytes("8a2dcda8", |cb| ldp_post(cb, X10, X11, A64Opnd::new_mem(64, X12, 208)));
+        check_bytes("8a2dcda8", |cb| {
+            ldp_post(cb, X10, X11, A64Opnd::new_mem(64, X12, 208))
+        });
     }
 
     #[test]
@@ -1315,33 +1692,45 @@ mod tests {
 
     #[test]
     fn test_ldr_post() {
-        check_bytes("6a0541f8", |cb| ldr_post(cb, X10, A64Opnd::new_mem(64, X11, 16)));
+        check_bytes("6a0541f8", |cb| {
+            ldr_post(cb, X10, A64Opnd::new_mem(64, X11, 16))
+        });
     }
 
     #[test]
     fn test_ldr_pre() {
-        check_bytes("6a0d41f8", |cb| ldr_pre(cb, X10, A64Opnd::new_mem(64, X11, 16)));
+        check_bytes("6a0d41f8", |cb| {
+            ldr_pre(cb, X10, A64Opnd::new_mem(64, X11, 16))
+        });
     }
 
     #[test]
     fn test_ldrh() {
-        check_bytes("6a194079", |cb| ldrh(cb, W10, A64Opnd::new_mem(64, X11, 12)));
+        check_bytes("6a194079", |cb| {
+            ldrh(cb, W10, A64Opnd::new_mem(64, X11, 12))
+        });
     }
 
     #[test]
     fn test_ldrh_pre() {
-        check_bytes("6acd4078", |cb| ldrh_pre(cb, W10, A64Opnd::new_mem(64, X11, 12)));
+        check_bytes("6acd4078", |cb| {
+            ldrh_pre(cb, W10, A64Opnd::new_mem(64, X11, 12))
+        });
     }
 
     #[test]
     fn test_ldrh_post() {
-        check_bytes("6ac54078", |cb| ldrh_post(cb, W10, A64Opnd::new_mem(64, X11, 12)));
+        check_bytes("6ac54078", |cb| {
+            ldrh_post(cb, W10, A64Opnd::new_mem(64, X11, 12))
+        });
     }
 
     #[test]
     fn test_ldurh_memory() {
         check_bytes("2a004078", |cb| ldurh(cb, W10, A64Opnd::new_mem(64, X1, 0)));
-        check_bytes("2ab04778", |cb| ldurh(cb, W10, A64Opnd::new_mem(64, X1, 123)));
+        check_bytes("2ab04778", |cb| {
+            ldurh(cb, W10, A64Opnd::new_mem(64, X1, 123))
+        });
     }
 
     #[test]
@@ -1356,7 +1745,9 @@ mod tests {
 
     #[test]
     fn test_ldursw() {
-        check_bytes("6ab187b8", |cb| ldursw(cb, X10, A64Opnd::new_mem(64, X11, 123)));
+        check_bytes("6ab187b8", |cb| {
+            ldursw(cb, X10, A64Opnd::new_mem(64, X11, 123))
+        });
     }
 
     #[test]
@@ -1376,7 +1767,9 @@ mod tests {
 
     #[test]
     fn test_mov_immediate() {
-        check_bytes("eaf300b2", |cb| mov(cb, X10, A64Opnd::new_uimm(0x5555555555555555)));
+        check_bytes("eaf300b2", |cb| {
+            mov(cb, X10, A64Opnd::new_uimm(0x5555555555555555))
+        });
     }
 
     #[test]
@@ -1420,7 +1813,7 @@ mod tests {
 
     #[test]
     fn test_nop() {
-        check_bytes("1f2003d5", |cb| nop(cb));
+        check_bytes("1f2003d5", nop);
     }
 
     #[test]
@@ -1460,52 +1853,72 @@ mod tests {
 
     #[test]
     fn test_stp() {
-        check_bytes("8a2d0da9", |cb| stp(cb, X10, X11, A64Opnd::new_mem(64, X12, 208)));
+        check_bytes("8a2d0da9", |cb| {
+            stp(cb, X10, X11, A64Opnd::new_mem(64, X12, 208))
+        });
     }
 
     #[test]
     fn test_stp_pre() {
-        check_bytes("8a2d8da9", |cb| stp_pre(cb, X10, X11, A64Opnd::new_mem(64, X12, 208)));
+        check_bytes("8a2d8da9", |cb| {
+            stp_pre(cb, X10, X11, A64Opnd::new_mem(64, X12, 208))
+        });
     }
 
     #[test]
     fn test_stp_post() {
-        check_bytes("8a2d8da8", |cb| stp_post(cb, X10, X11, A64Opnd::new_mem(64, X12, 208)));
+        check_bytes("8a2d8da8", |cb| {
+            stp_post(cb, X10, X11, A64Opnd::new_mem(64, X12, 208))
+        });
     }
 
     #[test]
     fn test_str_post() {
-        check_bytes("6a051ff8", |cb| str_post(cb, X10, A64Opnd::new_mem(64, X11, -16)));
+        check_bytes("6a051ff8", |cb| {
+            str_post(cb, X10, A64Opnd::new_mem(64, X11, -16))
+        });
     }
 
     #[test]
     fn test_str_pre() {
-        check_bytes("6a0d1ff8", |cb| str_pre(cb, X10, A64Opnd::new_mem(64, X11, -16)));
+        check_bytes("6a0d1ff8", |cb| {
+            str_pre(cb, X10, A64Opnd::new_mem(64, X11, -16))
+        });
     }
 
     #[test]
     fn test_strh() {
-        check_bytes("6a190079", |cb| strh(cb, W10, A64Opnd::new_mem(64, X11, 12)));
+        check_bytes("6a190079", |cb| {
+            strh(cb, W10, A64Opnd::new_mem(64, X11, 12))
+        });
     }
 
     #[test]
     fn test_strh_pre() {
-        check_bytes("6acd0078", |cb| strh_pre(cb, W10, A64Opnd::new_mem(64, X11, 12)));
+        check_bytes("6acd0078", |cb| {
+            strh_pre(cb, W10, A64Opnd::new_mem(64, X11, 12))
+        });
     }
 
     #[test]
     fn test_strh_post() {
-        check_bytes("6ac50078", |cb| strh_post(cb, W10, A64Opnd::new_mem(64, X11, 12)));
+        check_bytes("6ac50078", |cb| {
+            strh_post(cb, W10, A64Opnd::new_mem(64, X11, 12))
+        });
     }
 
     #[test]
     fn test_stur_64_bits() {
-        check_bytes("6a0108f8", |cb| stur(cb, X10, A64Opnd::new_mem(64, X11, 128)));
+        check_bytes("6a0108f8", |cb| {
+            stur(cb, X10, A64Opnd::new_mem(64, X11, 128))
+        });
     }
 
     #[test]
     fn test_stur_32_bits() {
-        check_bytes("6a0108b8", |cb| stur(cb, X10, A64Opnd::new_mem(32, X11, 128)));
+        check_bytes("6a0108b8", |cb| {
+            stur(cb, X10, A64Opnd::new_mem(32, X11, 128))
+        });
     }
 
     #[test]
@@ -1555,12 +1968,16 @@ mod tests {
 
     #[test]
     fn test_tbnz() {
-        check_bytes("4a005037", |cb| tbnz(cb, X10, A64Opnd::UImm(10), A64Opnd::Imm(2)));
+        check_bytes("4a005037", |cb| {
+            tbnz(cb, X10, A64Opnd::UImm(10), A64Opnd::Imm(2))
+        });
     }
 
     #[test]
     fn test_tbz() {
-        check_bytes("4a005036", |cb| tbz(cb, X10, A64Opnd::UImm(10), A64Opnd::Imm(2)));
+        check_bytes("4a005036", |cb| {
+            tbz(cb, X10, A64Opnd::UImm(10), A64Opnd::Imm(2))
+        });
     }
 
     #[test]

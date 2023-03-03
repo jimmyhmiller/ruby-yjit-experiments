@@ -1,4 +1,4 @@
-use super::super::arg::{Sf, truncate_uimm};
+use super::super::arg::{truncate_uimm, Sf};
 
 /// The struct that represents an A64 signed bitfield move instruction that can
 /// be encoded.
@@ -27,7 +27,7 @@ pub struct SBFM {
     n: bool,
 
     /// The size of this operation.
-    sf: Sf
+    sf: Sf,
 }
 
 impl SBFM {
@@ -40,13 +40,27 @@ impl SBFM {
             (0b011111, false)
         };
 
-        Self { rd, rn, immr: shift, imms, n, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            immr: shift,
+            imms,
+            n,
+            sf: num_bits.into(),
+        }
     }
 
     /// SXTW
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/SXTW--Sign-Extend-Word--an-alias-of-SBFM-?lang=en
     pub fn sxtw(rd: u8, rn: u8) -> Self {
-        Self { rd, rn, immr: 0, imms: 31, n: true, sf: Sf::Sf64 }
+        Self {
+            rd,
+            rn,
+            immr: 0,
+            imms: 31,
+            n: true,
+            sf: Sf::Sf64,
+        }
     }
 }
 
@@ -56,15 +70,14 @@ const FAMILY: u32 = 0b1001;
 impl From<SBFM> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: SBFM) -> Self {
-        0
-        | ((inst.sf as u32) << 31)
-        | (FAMILY << 25)
-        | (1 << 24)
-        | ((inst.n as u32) << 22)
-        | (truncate_uimm::<_, 6>(inst.immr) << 16)
-        | (truncate_uimm::<_, 6>(inst.imms) << 10)
-        | ((inst.rn as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | (FAMILY << 25)
+            | (1 << 24)
+            | ((inst.n as u32) << 22)
+            | (truncate_uimm::<_, 6>(inst.immr) << 16)
+            | (truncate_uimm::<_, 6>(inst.imms) << 10)
+            | ((inst.rn as u32) << 5)
+            | inst.rd as u32
     }
 }
 

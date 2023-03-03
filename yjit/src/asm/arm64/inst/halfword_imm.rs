@@ -3,7 +3,7 @@ use super::super::arg::truncate_imm;
 /// Whether this is a load or a store.
 enum Op {
     Load = 1,
-    Store = 0
+    Store = 0,
 }
 
 /// The type of indexing to perform for this instruction.
@@ -15,7 +15,7 @@ enum Index {
     PostIndex = 0b01,
 
     /// Mutate the register before the read.
-    PreIndex = 0b11
+    PreIndex = 0b11,
 }
 
 /// The struct that represents an A64 halfword instruction that can be encoded.
@@ -48,44 +48,80 @@ pub struct HalfwordImm {
     imm: i16,
 
     /// The operation to perform.
-    op: Op
+    op: Op,
 }
 
 impl HalfwordImm {
     /// LDRH
     /// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/LDRH--immediate---Load-Register-Halfword--immediate--
     pub fn ldrh(rt: u8, rn: u8, imm12: i16) -> Self {
-        Self { rt, rn, index: Index::None, imm: imm12, op: Op::Load }
+        Self {
+            rt,
+            rn,
+            index: Index::None,
+            imm: imm12,
+            op: Op::Load,
+        }
     }
 
     /// LDRH (pre-index)
     /// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/LDRH--immediate---Load-Register-Halfword--immediate--
     pub fn ldrh_pre(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, index: Index::PreIndex, imm: imm9, op: Op::Load }
+        Self {
+            rt,
+            rn,
+            index: Index::PreIndex,
+            imm: imm9,
+            op: Op::Load,
+        }
     }
 
     /// LDRH (post-index)
     /// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/LDRH--immediate---Load-Register-Halfword--immediate--
     pub fn ldrh_post(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, index: Index::PostIndex, imm: imm9, op: Op::Load }
+        Self {
+            rt,
+            rn,
+            index: Index::PostIndex,
+            imm: imm9,
+            op: Op::Load,
+        }
     }
 
     /// STRH
     /// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/STRH--immediate---Store-Register-Halfword--immediate--
     pub fn strh(rt: u8, rn: u8, imm12: i16) -> Self {
-        Self { rt, rn, index: Index::None, imm: imm12, op: Op::Store }
+        Self {
+            rt,
+            rn,
+            index: Index::None,
+            imm: imm12,
+            op: Op::Store,
+        }
     }
 
     /// STRH (pre-index)
     /// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/STRH--immediate---Store-Register-Halfword--immediate--
     pub fn strh_pre(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, index: Index::PreIndex, imm: imm9, op: Op::Store }
+        Self {
+            rt,
+            rn,
+            index: Index::PreIndex,
+            imm: imm9,
+            op: Op::Store,
+        }
     }
 
     /// STRH (post-index)
     /// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/STRH--immediate---Store-Register-Halfword--immediate--
     pub fn strh_post(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, index: Index::PostIndex, imm: imm9, op: Op::Store }
+        Self {
+            rt,
+            rn,
+            index: Index::PostIndex,
+            imm: imm9,
+            op: Op::Store,
+        }
     }
 }
 
@@ -100,19 +136,18 @@ impl From<HalfwordImm> for u32 {
                 assert_eq!(inst.imm & 1, 0, "immediate offset must be even");
                 let imm12 = truncate_imm::<_, 12>(inst.imm / 2);
                 (0b100, imm12)
-            },
+            }
             Index::PreIndex | Index::PostIndex => {
                 let imm9 = truncate_imm::<_, 9>(inst.imm);
                 (0b000, (imm9 << 2) | (inst.index as u32))
             }
         };
 
-        0
-        | (FAMILY << 25)
-        | ((opc | (inst.op as u32)) << 22)
-        | (imm << 10)
-        | ((inst.rn as u32) << 5)
-        | (inst.rt as u32)
+        (FAMILY << 25)
+            | ((opc | (inst.op as u32)) << 22)
+            | (imm << 10)
+            | ((inst.rn as u32) << 5)
+            | (inst.rt as u32)
     }
 }
 

@@ -6,7 +6,7 @@ enum Opc {
     LSL,
 
     /// Logical shift right
-    LSR
+    LSR,
 }
 
 /// The struct that represents an A64 unsigned bitfield move instruction that
@@ -33,20 +33,32 @@ pub struct ShiftImm {
     opc: Opc,
 
     /// Whether or not this instruction is operating on 64-bit operands.
-    sf: Sf
+    sf: Sf,
 }
 
 impl ShiftImm {
     /// LSL (immediate)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LSL--immediate---Logical-Shift-Left--immediate---an-alias-of-UBFM-?lang=en
     pub fn lsl(rd: u8, rn: u8, shift: u8, num_bits: u8) -> Self {
-        ShiftImm { rd, rn, shift, opc: Opc::LSL, sf: num_bits.into() }
+        ShiftImm {
+            rd,
+            rn,
+            shift,
+            opc: Opc::LSL,
+            sf: num_bits.into(),
+        }
     }
 
     /// LSR (immediate)
     /// https://developer.arm.com/documentation/ddi0602/2021-12/Base-Instructions/LSR--immediate---Logical-Shift-Right--immediate---an-alias-of-UBFM-?lang=en
     pub fn lsr(rd: u8, rn: u8, shift: u8, num_bits: u8) -> Self {
-        ShiftImm { rd, rn, shift, opc: Opc::LSR, sf: num_bits.into() }
+        ShiftImm {
+            rd,
+            rn,
+            shift,
+            opc: Opc::LSR,
+            sf: num_bits.into(),
+        }
     }
 
     /// Returns a triplet of (n, immr, imms) encoded in u32s for this
@@ -63,24 +75,22 @@ impl ShiftImm {
                     Sf::Sf32 => (
                         0,
                         (shift.rem_euclid(32) & 0x3f) as u32,
-                        ((31 - self.shift) & 0x3f) as u32
+                        ((31 - self.shift) & 0x3f) as u32,
                     ),
                     Sf::Sf64 => (
                         1,
                         (shift.rem_euclid(64) & 0x3f) as u32,
-                        ((63 - self.shift) & 0x3f) as u32
-                    )
+                        ((63 - self.shift) & 0x3f) as u32,
+                    ),
                 }
-            },
+            }
             // Similar to LSL:
             // LSR <Wd>, <Wn>, #<shift> == UBFM <Wd>, <Wn>, #<shift>, #31
             // LSR <Xd>, <Xn>, #<shift> == UBFM <Xd>, <Xn>, #<shift>, #63
-            Opc::LSR => {
-                match self.sf {
-                    Sf::Sf32 => (0, (self.shift & 0x3f) as u32, 31),
-                    Sf::Sf64 => (1, (self.shift & 0x3f) as u32, 63)
-                }
-            }
+            Opc::LSR => match self.sf {
+                Sf::Sf32 => (0, (self.shift & 0x3f) as u32, 31),
+                Sf::Sf64 => (1, (self.shift & 0x3f) as u32, 63),
+            },
         }
     }
 }
@@ -93,15 +103,14 @@ impl From<ShiftImm> for u32 {
     fn from(inst: ShiftImm) -> Self {
         let (n, immr, imms) = inst.bitmask();
 
-        0
-        | ((inst.sf as u32) << 31)
-        | (1 << 30)
-        | (FAMILY << 24)
-        | (n << 22)
-        | (immr << 16)
-        | (imms << 10)
-        | ((inst.rn as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | (1 << 30)
+            | (FAMILY << 24)
+            | (n << 22)
+            | (immr << 16)
+            | (imms << 10)
+            | ((inst.rn as u32) << 5)
+            | inst.rd as u32
     }
 }
 

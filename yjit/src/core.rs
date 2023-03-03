@@ -1,22 +1,22 @@
 use crate::asm::*;
 use crate::backend::ir::*;
 use crate::codegen::*;
-use crate::virtualmem::CodePtr;
 use crate::cruby::*;
+#[cfg(feature = "disasm")]
+use crate::disasm::*;
+use crate::invariants::block_assumptions_free;
 use crate::options::*;
 use crate::stats::*;
 use crate::utils::*;
-#[cfg(feature="disasm")]
-use crate::disasm::*;
+use crate::virtualmem::CodePtr;
 use core::ffi::c_void;
 use std::cell::*;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::mem;
-use std::rc::{Rc};
-use YARVOpnd::*;
+use std::rc::Rc;
 use TempMapping::*;
-use crate::invariants::block_assumptions_free;
+use YARVOpnd::*;
 
 // Maximum number of temp value types we keep track of
 pub const MAX_TEMP_TYPES: usize = 8;
@@ -43,8 +43,8 @@ pub enum Type {
 
     TString, // An object with the T_STRING flag set, possibly an rb_cString
     CString, // An un-subclassed string of type rb_cString (can have instance vars in some cases)
-    TArray, // An object with the T_ARRAY flag set, possibly an rb_cArray
-    CArray, // An un-subclassed string of type rb_cArray (can have instance vars in some cases)
+    TArray,  // An object with the T_ARRAY flag set, possibly an rb_cArray
+    CArray,  // An un-subclassed string of type rb_cArray (can have instance vars in some cases)
 
     BlockParamProxy, // A special sentinel value indicating the block parameter should be read from
                      // the current surrounding cfp
@@ -206,7 +206,7 @@ impl Type {
             Type::False => Some(false),
             Type::UnknownHeap => Some(true),
             Type::Unknown | Type::UnknownImm => None,
-            _ => Some(true)
+            _ => Some(true),
         }
     }
 
@@ -215,8 +215,8 @@ impl Type {
         match (self, self.known_truthy()) {
             (Type::Nil, _) => Some(true),
             (Type::False, _) => Some(false), // Qfalse is not nil
-            (_, Some(true))  => Some(false), // if truthy, can't be nil
-            (_, _) => None // otherwise unknown
+            (_, Some(true)) => Some(false),  // if truthy, can't be nil
+            (_, _) => None,                  // otherwise unknown
         }
     }
 
@@ -253,7 +253,7 @@ impl Type {
         }
 
         // Incompatible types
-        return TypeDiff::Incompatible;
+        TypeDiff::Incompatible
     }
 
     /// Upgrade this type into a more specific compatible type
@@ -347,7 +347,7 @@ impl From<Opnd> for YARVOpnd {
     fn from(value: Opnd) -> Self {
         match value {
             Opnd::Stack { idx, .. } => StackOpnd(idx.try_into().unwrap()),
-            _ => unreachable!("{:?} cannot be converted to YARVOpnd", value)
+            _ => unreachable!("{:?} cannot be converted to YARVOpnd", value),
         }
     }
 }
@@ -415,36 +415,30 @@ pub enum BranchGenFn {
 impl BranchGenFn {
     pub fn call(self, asm: &mut Assembler, target0: CodePtr, target1: Option<CodePtr>) {
         match self {
-            BranchGenFn::BranchIf(shape) => {
-                match shape {
-                    BranchShape::Next0 => asm.jz(target1.unwrap().into()),
-                    BranchShape::Next1 => asm.jnz(target0.into()),
-                    BranchShape::Default => {
-                        asm.jnz(target0.into());
-                        asm.jmp(target1.unwrap().into());
-                    }
+            BranchGenFn::BranchIf(shape) => match shape {
+                BranchShape::Next0 => asm.jz(target1.unwrap().into()),
+                BranchShape::Next1 => asm.jnz(target0.into()),
+                BranchShape::Default => {
+                    asm.jnz(target0.into());
+                    asm.jmp(target1.unwrap().into());
                 }
-            }
-            BranchGenFn::BranchNil(shape) => {
-                match shape {
-                    BranchShape::Next0 => asm.jne(target1.unwrap().into()),
-                    BranchShape::Next1 => asm.je(target0.into()),
-                    BranchShape::Default => {
-                        asm.je(target0.into());
-                        asm.jmp(target1.unwrap().into());
-                    }
+            },
+            BranchGenFn::BranchNil(shape) => match shape {
+                BranchShape::Next0 => asm.jne(target1.unwrap().into()),
+                BranchShape::Next1 => asm.je(target0.into()),
+                BranchShape::Default => {
+                    asm.je(target0.into());
+                    asm.jmp(target1.unwrap().into());
                 }
-            }
-            BranchGenFn::BranchUnless(shape) => {
-                match shape {
-                    BranchShape::Next0 => asm.jnz(target1.unwrap().into()),
-                    BranchShape::Next1 => asm.jz(target0.into()),
-                    BranchShape::Default => {
-                        asm.jz(target0.into());
-                        asm.jmp(target1.unwrap().into());
-                    }
+            },
+            BranchGenFn::BranchUnless(shape) => match shape {
+                BranchShape::Next0 => asm.jnz(target1.unwrap().into()),
+                BranchShape::Next1 => asm.jz(target0.into()),
+                BranchShape::Default => {
+                    asm.jz(target0.into());
+                    asm.jmp(target1.unwrap().into());
                 }
-            }
+            },
             BranchGenFn::JumpToTarget0(shape) => {
                 if shape == BranchShape::Next1 {
                     panic!("Branch shape Next1 not allowed in JumpToTarget0!");
@@ -453,40 +447,37 @@ impl BranchGenFn {
                     asm.jmp(target0.into());
                 }
             }
-            BranchGenFn::JNZToTarget0 => {
-                asm.jnz(target0.into())
-            }
-            BranchGenFn::JZToTarget0 => {
-                asm.jz(Target::CodePtr(target0))
-            }
-            BranchGenFn::JBEToTarget0 => {
-                asm.jbe(Target::CodePtr(target0))
-            }
+            BranchGenFn::JNZToTarget0 => asm.jnz(target0.into()),
+            BranchGenFn::JZToTarget0 => asm.jz(Target::CodePtr(target0)),
+            BranchGenFn::JBEToTarget0 => asm.jbe(Target::CodePtr(target0)),
             BranchGenFn::JITReturn => {
                 asm.comment("update cfp->jit_return");
-                asm.mov(Opnd::mem(64, CFP, RUBY_OFFSET_CFP_JIT_RETURN), Opnd::const_ptr(target0.raw_ptr()));
+                asm.mov(
+                    Opnd::mem(64, CFP, RUBY_OFFSET_CFP_JIT_RETURN),
+                    Opnd::const_ptr(target0.raw_ptr()),
+                );
             }
         }
     }
 
     pub fn get_shape(self) -> BranchShape {
         match self {
-            BranchGenFn::BranchIf(shape) |
-            BranchGenFn::BranchNil(shape) |
-            BranchGenFn::BranchUnless(shape) |
-            BranchGenFn::JumpToTarget0(shape) => shape,
-            BranchGenFn::JNZToTarget0 |
-            BranchGenFn::JZToTarget0 |
-            BranchGenFn::JBEToTarget0 |
-            BranchGenFn::JITReturn => BranchShape::Default,
+            BranchGenFn::BranchIf(shape)
+            | BranchGenFn::BranchNil(shape)
+            | BranchGenFn::BranchUnless(shape)
+            | BranchGenFn::JumpToTarget0(shape) => shape,
+            BranchGenFn::JNZToTarget0
+            | BranchGenFn::JZToTarget0
+            | BranchGenFn::JBEToTarget0
+            | BranchGenFn::JITReturn => BranchShape::Default,
         }
     }
 
     pub fn set_shape(&mut self, new_shape: BranchShape) {
         match self {
-            BranchGenFn::BranchIf(shape) |
-            BranchGenFn::BranchNil(shape) |
-            BranchGenFn::BranchUnless(shape) => {
+            BranchGenFn::BranchIf(shape)
+            | BranchGenFn::BranchNil(shape)
+            | BranchGenFn::BranchUnless(shape) => {
                 *shape = new_shape;
             }
             BranchGenFn::JumpToTarget0(shape) => {
@@ -495,10 +486,10 @@ impl BranchGenFn {
                 }
                 *shape = new_shape;
             }
-            BranchGenFn::JNZToTarget0 |
-            BranchGenFn::JZToTarget0 |
-            BranchGenFn::JBEToTarget0 |
-            BranchGenFn::JITReturn => {
+            BranchGenFn::JNZToTarget0
+            | BranchGenFn::JZToTarget0
+            | BranchGenFn::JBEToTarget0
+            | BranchGenFn::JITReturn => {
                 assert_eq!(new_shape, BranchShape::Default);
             }
         }
@@ -582,7 +573,9 @@ impl Branch {
 
     /// Get the address of one of the branch destination
     fn get_target_address(&self, target_idx: usize) -> Option<CodePtr> {
-        self.targets[target_idx].as_ref().and_then(|target| target.get_address())
+        self.targets[target_idx]
+            .as_ref()
+            .and_then(|target| target.get_address())
     }
 
     fn get_stub_count(&self) -> usize {
@@ -956,7 +949,9 @@ pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
             for branch in outgoing_branches.iter() {
                 let mut branch = branch.borrow_mut();
                 for target in branch.targets.iter_mut().flatten() {
-                    target.set_iseq(unsafe { rb_gc_location(target.get_blockid().iseq.into()) }.as_iseq());
+                    target.set_iseq(
+                        unsafe { rb_gc_location(target.get_blockid().iseq.into()) }.as_iseq(),
+                    );
                 }
             }
         }
@@ -976,8 +971,8 @@ fn get_version_list(blockid: BlockId) -> Option<&'static mut VersionList> {
     match get_iseq_payload(blockid.iseq) {
         Some(payload) if insn_idx < payload.version_map.len() => {
             Some(payload.version_map.get_mut(insn_idx).unwrap())
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
@@ -1002,7 +997,7 @@ pub fn take_version_list(blockid: BlockId) -> VersionList {
     match get_iseq_payload(blockid.iseq) {
         Some(payload) if insn_idx < payload.version_map.len() => {
             mem::take(&mut payload.version_map[insn_idx])
-        },
+        }
         _ => VersionList::default(),
     }
 }
@@ -1011,13 +1006,11 @@ pub fn take_version_list(blockid: BlockId) -> VersionList {
 fn get_num_versions(blockid: BlockId) -> usize {
     let insn_idx = blockid.idx.as_usize();
     match get_iseq_payload(blockid.iseq) {
-        Some(payload) => {
-            payload
-                .version_map
-                .get(insn_idx)
-                .map(|versions| versions.len())
-                .unwrap_or(0)
-        }
+        Some(payload) => payload
+            .version_map
+            .get(insn_idx)
+            .map(|versions| versions.len())
+            .unwrap_or(0),
         None => 0,
     }
 }
@@ -1040,7 +1033,7 @@ pub fn get_or_create_iseq_block_list(iseq: IseqPtr) -> Vec<BlockRef> {
         }
     }
 
-    return blocks;
+    blocks
 }
 
 /// Retrieve a basic block version for an (iseq, idx) tuple
@@ -1077,7 +1070,7 @@ fn find_block_version(blockid: BlockId, ctx: &Context) -> Option<BlockRef> {
         }
     }
 
-    return best_version;
+    best_version
 }
 
 /// Produce a generic context when the block version limit is hit for a blockid
@@ -1105,7 +1098,7 @@ pub fn limit_block_versions(blockid: BlockId, ctx: &Context) -> Context {
         return generic_ctx;
     }
 
-    return ctx.clone();
+    ctx.clone()
 }
 
 /// Keep track of a block version. Block should be fully constructed.
@@ -1293,7 +1286,7 @@ impl Context {
     pub fn sp_opnd(&self, offset_bytes: isize) -> Opnd {
         let offset = ((self.sp_offset as isize) * (SIZEOF_VALUE as isize)) + offset_bytes;
         let offset = offset as i32;
-        return Opnd::mem(64, SP, offset);
+        Opnd::mem(64, SP, offset)
     }
 
     /// Push one new value on the temp stack with an explicit mapping
@@ -1319,18 +1312,18 @@ impl Context {
         self.stack_size += 1;
         self.sp_offset += 1;
 
-        return self.stack_opnd(0);
+        self.stack_opnd(0)
     }
 
     /// Push one new value on the temp stack
     /// Return a pointer to the new stack top
     pub fn stack_push(&mut self, val_type: Type) -> Opnd {
-        return self.stack_push_mapping((MapToStack, val_type));
+        self.stack_push_mapping((MapToStack, val_type))
     }
 
     /// Push the self value on the stack
     pub fn stack_push_self(&mut self) -> Opnd {
-        return self.stack_push_mapping((MapToSelf, Type::Unknown));
+        self.stack_push_mapping((MapToSelf, Type::Unknown))
     }
 
     /// Push a local variable on the stack
@@ -1339,7 +1332,7 @@ impl Context {
             return self.stack_push(Type::Unknown);
         }
 
-        return self.stack_push_mapping((MapToLocal((local_idx as u8).into()), Type::Unknown));
+        self.stack_push_mapping((MapToLocal((local_idx as u8).into()), Type::Unknown))
     }
 
     // Pop N values off the stack
@@ -1362,16 +1355,15 @@ impl Context {
         self.stack_size -= n as u8;
         self.sp_offset -= n as i8;
 
-        return top;
+        top
     }
 
     pub fn shift_stack(&mut self, argc: usize) {
         assert!(argc < self.stack_size.into());
 
-        let method_name_index = (self.stack_size as usize) - (argc as usize) - 1;
+        let method_name_index = (self.stack_size as usize) - argc - 1;
 
         for i in method_name_index..(self.stack_size - 1) as usize {
-
             if i + 1 < MAX_TEMP_TYPES {
                 self.temp_types[i] = self.temp_types[i + 1];
                 self.temp_mapping[i] = self.temp_mapping[i + 1];
@@ -1382,7 +1374,11 @@ impl Context {
 
     /// Get an operand pointing to a slot on the temp stack
     pub fn stack_opnd(&self, idx: i32) -> Opnd {
-        Opnd::Stack { idx, sp_offset: self.sp_offset, num_bits: 64 }
+        Opnd::Stack {
+            idx,
+            sp_offset: self.sp_offset,
+            num_bits: 64,
+        }
     }
 
     /// Get the type of an instruction operand
@@ -1405,7 +1401,7 @@ impl Context {
                     MapToStack => self.temp_types[(self.stack_size - 1 - idx) as usize],
                     MapToLocal(idx) => {
                         assert!((idx as usize) < MAX_LOCAL_TYPES);
-                        return self.local_types[idx as usize];
+                        self.local_types[idx as usize]
                     }
                 }
             }
@@ -1622,7 +1618,7 @@ impl Context {
             };
         }
 
-        return TypeDiff::Compatible(diff);
+        TypeDiff::Compatible(diff)
     }
 
     pub fn two_fixnums_on_stack(&self, jit: &mut JITState) -> Option<bool> {
@@ -1706,7 +1702,7 @@ fn gen_block_series_body(
         // leaving a single target that has a `None` address.
         let last_target = match &mut last_branch.targets {
             [Some(last_target), None] if last_target.get_address().is_none() => last_target,
-            _ => break
+            _ => break,
         };
 
         incr_counter!(block_next_count);
@@ -1759,8 +1755,17 @@ fn gen_block_series_body(
             let iseq_location = iseq_get_location(blockid.iseq, blockid_idx);
             if iseq_location.contains(substr) {
                 let last_block = last_blockref.borrow();
-                println!("Compiling {} block(s) for {}, ISEQ offsets [{}, {})", batch.len(), iseq_location, blockid_idx, last_block.end_idx);
-                print!("{}", disasm_iseq_insn_range(blockid.iseq, blockid.idx, last_block.end_idx));
+                println!(
+                    "Compiling {} block(s) for {}, ISEQ offsets [{}, {})",
+                    batch.len(),
+                    iseq_location,
+                    blockid_idx,
+                    last_block.end_idx
+                );
+                print!(
+                    "{}",
+                    disasm_iseq_insn_range(blockid.iseq, blockid.idx, last_block.end_idx)
+                );
             }
         }
     }
@@ -1815,7 +1820,7 @@ pub fn gen_entry_point(iseq: IseqPtr, ec: EcPtr) -> Option<CodePtr> {
     }
 
     // Compilation successful and block not empty
-    return code_ptr;
+    code_ptr
 }
 
 /// Generate code for a branch, possibly rewriting and changing the size of it
@@ -1891,7 +1896,7 @@ fn make_branch_entry(jit: &mut JITState, block: &BlockRef, gen_fn: BranchGenFn) 
     jit.push_outgoing(branchref.clone());
     incr_counter!(compiled_branch_count);
 
-    return branchref;
+    branchref
 }
 
 c_callable! {
@@ -1956,7 +1961,10 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
         let reconned_pc = rb_iseq_pc_at_idx(running_iseq, target_blockid.idx);
         let reconned_sp = original_interp_sp.offset(target_ctx.sp_offset.into());
 
-        assert_eq!(running_iseq, target_blockid.iseq as _, "each stub expects a particular iseq");
+        assert_eq!(
+            running_iseq, target_blockid.iseq as _,
+            "each stub expects a particular iseq"
+        );
 
         // Update the PC in the current CFP, because it may be out of sync in JITted code
         rb_set_cfp_pc(cfp, reconned_pc);
@@ -2017,7 +2025,10 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
             let mut block: RefMut<_> = block_rc.borrow_mut();
 
             // Branch shape should reflect layout
-            assert!(!(branch.gen_fn.get_shape() == target_branch_shape && Some(block.start_addr) != branch.end_addr));
+            assert!(
+                !(branch.gen_fn.get_shape() == target_branch_shape
+                    && Some(block.start_addr) != branch.end_addr)
+            );
 
             // Add this branch to the list of incoming branches for the target
             block.push_incoming(branch_rc.clone());
@@ -2065,7 +2076,9 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
     assert!(
         new_branch_size <= branch_size_on_entry,
         "branch stubs should never enlarge branches (start_addr: {:?}, old_size: {}, new_size: {})",
-        branch.start_addr.unwrap().raw_ptr(), branch_size_on_entry, new_branch_size,
+        branch.start_addr.unwrap().raw_ptr(),
+        branch_size_on_entry,
+        new_branch_size,
     );
 
     // Return a pointer to the compiled block version
@@ -2091,7 +2104,8 @@ fn set_branch_target(
         block.push_incoming(branchref.clone());
 
         // Fill out the target with this block
-        branch.targets[target_idx.as_usize()] = Some(Box::new(BranchTarget::Block(blockref.clone())));
+        branch.targets[target_idx.as_usize()] =
+            Some(Box::new(BranchTarget::Block(blockref.clone())));
 
         return;
     }
@@ -2126,11 +2140,12 @@ fn set_branch_target(
         // No space
     } else {
         // Fill the branch target with a stub
-        branch.targets[target_idx.as_usize()] = Some(Box::new(BranchTarget::Stub(Box::new(BranchStub {
-            address: Some(stub_addr),
-            id: target,
-            ctx: ctx.clone(),
-        }))));
+        branch.targets[target_idx.as_usize()] =
+            Some(Box::new(BranchTarget::Stub(Box::new(BranchStub {
+                address: Some(stub_addr),
+                id: target,
+                ctx: ctx.clone(),
+            }))));
     }
 }
 
@@ -2148,11 +2163,7 @@ pub fn gen_branch_stub_hit_trampoline(ocb: &mut OutlinedCb) -> CodePtr {
     asm.comment("branch_stub_hit() trampoline");
     let jump_addr = asm.ccall(
         branch_stub_hit as *mut u8,
-        vec![
-            C_ARG_OPNDS[0],
-            C_ARG_OPNDS[1],
-            EC,
-        ]
+        vec![C_ARG_OPNDS[0], C_ARG_OPNDS[1], EC],
     );
 
     // Jump to the address returned by the branch_stub_hit() call
@@ -2163,11 +2174,9 @@ pub fn gen_branch_stub_hit_trampoline(ocb: &mut OutlinedCb) -> CodePtr {
     code_ptr
 }
 
-impl Assembler
-{
+impl Assembler {
     // Mark the start position of a patchable branch in the machine code
-    fn mark_branch_start(&mut self, branchref: &BranchRef)
-    {
+    fn mark_branch_start(&mut self, branchref: &BranchRef) {
         // We need to create our own branch rc object
         // so that we can move the closure below
         let branchref = branchref.clone();
@@ -2179,8 +2188,7 @@ impl Assembler
     }
 
     // Mark the end position of a patchable branch in the machine code
-    fn mark_branch_end(&mut self, branchref: &BranchRef)
-    {
+    fn mark_branch_end(&mut self, branchref: &BranchRef) {
         // We need to create our own branch rc object
         // so that we can move the closure below
         let branchref = branchref.clone();
@@ -2223,7 +2231,11 @@ pub fn gen_branch(
 }
 
 pub fn gen_direct_jump(jit: &mut JITState, ctx: &Context, target0: BlockId, asm: &mut Assembler) {
-    let branchref = make_branch_entry(jit, &jit.get_block(), BranchGenFn::JumpToTarget0(BranchShape::Default));
+    let branchref = make_branch_entry(
+        jit,
+        &jit.get_block(),
+        BranchGenFn::JumpToTarget0(BranchShape::Default),
+    );
     let mut branch = branchref.borrow_mut();
 
     let mut new_target = BranchTarget::Stub(Box::new(BranchStub {
@@ -2283,7 +2295,11 @@ pub fn defer_compilation(
     next_ctx.chain_depth += 1;
 
     let block_rc = jit.get_block();
-    let branch_rc = make_branch_entry(jit, &jit.get_block(), BranchGenFn::JumpToTarget0(BranchShape::Default));
+    let branch_rc = make_branch_entry(
+        jit,
+        &jit.get_block(),
+        BranchGenFn::JumpToTarget0(BranchShape::Default),
+    );
     let mut branch = branch_rc.borrow_mut();
     let block = block_rc.borrow();
 
@@ -2375,7 +2391,7 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
     // machine code that some other thread is running.
 
     let block = blockref.borrow();
-    let mut cb = CodegenGlobals::get_inline_cb();
+    let cb = CodegenGlobals::get_inline_cb();
     let ocb = CodegenGlobals::get_outlined_cb();
 
     verify_blockid(block.blockid);
@@ -2387,7 +2403,10 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
             let blockid_idx = block.blockid.idx;
             let iseq_location = iseq_get_location(block.blockid.iseq, blockid_idx);
             if iseq_location.contains(substr) {
-                println!("Invalidating block from {}, ISEQ offsets [{}, {})", iseq_location, blockid_idx, block.end_idx);
+                println!(
+                    "Invalidating block from {}, ISEQ offsets [{}, {})",
+                    iseq_location, blockid_idx, block.end_idx
+                );
             }
         }
     }
@@ -2426,7 +2445,7 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
             let mut asm = Assembler::new();
             asm.jmp(block_entry_exit.as_side_exit());
             cb.set_dropped_bytes(false);
-            asm.compile(&mut cb);
+            asm.compile(cb);
 
             assert!(
                 cb.get_write_ptr() <= block_end,
@@ -2458,7 +2477,14 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
         }
 
         // Create a stub for this branch target or rewire it to a valid block
-        set_branch_target(target_idx as u32, block.blockid, &block.ctx, branchref, &mut branch, ocb);
+        set_branch_target(
+            target_idx as u32,
+            block.blockid,
+            &block.ctx,
+            branchref,
+            &mut branch,
+            ocb,
+        );
 
         if branch.targets[target_idx].is_none() {
             // We were unable to generate a stub (e.g. OOM). Use the block's
@@ -2493,7 +2519,9 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
         if !target_next && branch.code_size() > old_branch_size {
             panic!(
                 "invalidated branch grew in size (start_addr: {:?}, old_size: {}, new_size: {})",
-                branch.start_addr.unwrap().raw_ptr(), old_branch_size, branch.code_size()
+                branch.start_addr.unwrap().raw_ptr(),
+                old_branch_size,
+                branch.code_size()
             );
         }
     }
@@ -2557,7 +2585,10 @@ mod tests {
     fn types() {
         // Valid src => dst
         assert_eq!(Type::Unknown.diff(Type::Unknown), TypeDiff::Compatible(0));
-        assert_eq!(Type::UnknownImm.diff(Type::UnknownImm), TypeDiff::Compatible(0));
+        assert_eq!(
+            Type::UnknownImm.diff(Type::UnknownImm),
+            TypeDiff::Compatible(0)
+        );
         assert_ne!(Type::UnknownImm.diff(Type::Unknown), TypeDiff::Incompatible);
         assert_ne!(Type::Fixnum.diff(Type::Unknown), TypeDiff::Incompatible);
         assert_ne!(Type::Fixnum.diff(Type::UnknownImm), TypeDiff::Incompatible);
@@ -2571,7 +2602,10 @@ mod tests {
     #[test]
     fn context() {
         // Valid src => dst
-        assert_eq!(Context::default().diff(&Context::default()), TypeDiff::Compatible(0));
+        assert_eq!(
+            Context::default().diff(&Context::default()),
+            TypeDiff::Compatible(0)
+        );
 
         // Try pushing an operand and getting its type
         let mut ctx = Context::default();

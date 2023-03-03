@@ -1,4 +1,4 @@
-use super::super::arg::{Sf, truncate_uimm};
+use super::super::arg::{truncate_uimm, Sf};
 
 /// Whether or not this is a NOT instruction.
 enum N {
@@ -6,7 +6,7 @@ enum N {
     No = 0,
 
     /// This is a NOT instruction.
-    Yes = 1
+    Yes = 1,
 }
 
 /// The type of shift to perform on the second operand register.
@@ -14,7 +14,7 @@ enum Shift {
     LSL = 0b00, // logical shift left (unsigned)
     LSR = 0b01, // logical shift right (unsigned)
     ASR = 0b10, // arithmetic shift right (signed)
-    ROR = 0b11  // rotate right (unsigned)
+    ROR = 0b11, // rotate right (unsigned)
 }
 
 // Which operation to perform.
@@ -29,7 +29,7 @@ enum Opc {
     Eor = 0b10,
 
     /// The ANDS operation.
-    Ands = 0b11
+    Ands = 0b11,
 }
 
 /// The struct that represents an A64 logical register instruction that can be
@@ -65,56 +65,128 @@ pub struct LogicalReg {
     opc: Opc,
 
     /// Whether or not this instruction is operating on 64-bit operands.
-    sf: Sf
+    sf: Sf,
 }
 
 impl LogicalReg {
     /// AND (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/AND--shifted-register---Bitwise-AND--shifted-register--?lang=en
     pub fn and(rd: u8, rn: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn, imm6: 0, rm, n: N::No, shift: Shift::LSL, opc: Opc::And, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm6: 0,
+            rm,
+            n: N::No,
+            shift: Shift::LSL,
+            opc: Opc::And,
+            sf: num_bits.into(),
+        }
     }
 
     /// ANDS (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ANDS--shifted-register---Bitwise-AND--shifted-register---setting-flags-?lang=en
     pub fn ands(rd: u8, rn: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn, imm6: 0, rm, n: N::No, shift: Shift::LSL, opc: Opc::Ands, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm6: 0,
+            rm,
+            n: N::No,
+            shift: Shift::LSL,
+            opc: Opc::Ands,
+            sf: num_bits.into(),
+        }
     }
 
     /// EOR (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/EOR--shifted-register---Bitwise-Exclusive-OR--shifted-register--
     pub fn eor(rd: u8, rn: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn, imm6: 0, rm, n: N::No, shift: Shift::LSL, opc: Opc::Eor, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm6: 0,
+            rm,
+            n: N::No,
+            shift: Shift::LSL,
+            opc: Opc::Eor,
+            sf: num_bits.into(),
+        }
     }
 
     /// MOV (register)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/MOV--register---Move--register---an-alias-of-ORR--shifted-register--?lang=en
     pub fn mov(rd: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn: 0b11111, imm6: 0, rm, n: N::No, shift: Shift::LSL, opc: Opc::Orr, sf: num_bits.into() }
+        Self {
+            rd,
+            rn: 0b11111,
+            imm6: 0,
+            rm,
+            n: N::No,
+            shift: Shift::LSL,
+            opc: Opc::Orr,
+            sf: num_bits.into(),
+        }
     }
 
     /// MVN (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/MVN--Bitwise-NOT--an-alias-of-ORN--shifted-register--?lang=en
     pub fn mvn(rd: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn: 0b11111, imm6: 0, rm, n: N::Yes, shift: Shift::LSL, opc: Opc::Orr, sf: num_bits.into() }
+        Self {
+            rd,
+            rn: 0b11111,
+            imm6: 0,
+            rm,
+            n: N::Yes,
+            shift: Shift::LSL,
+            opc: Opc::Orr,
+            sf: num_bits.into(),
+        }
     }
 
     /// ORN (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/ORN--shifted-register---Bitwise-OR-NOT--shifted-register--
     pub fn orn(rd: u8, rn: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn, imm6: 0, rm, n: N::Yes, shift: Shift::LSL, opc: Opc::Orr, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm6: 0,
+            rm,
+            n: N::Yes,
+            shift: Shift::LSL,
+            opc: Opc::Orr,
+            sf: num_bits.into(),
+        }
     }
 
     /// ORR (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/ORR--shifted-register---Bitwise-OR--shifted-register--
     pub fn orr(rd: u8, rn: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd, rn, imm6: 0, rm, n: N::No, shift: Shift::LSL, opc: Opc::Orr, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm6: 0,
+            rm,
+            n: N::No,
+            shift: Shift::LSL,
+            opc: Opc::Orr,
+            sf: num_bits.into(),
+        }
     }
 
     /// TST (shifted register)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/TST--shifted-register---Test--shifted-register---an-alias-of-ANDS--shifted-register--?lang=en
     pub fn tst(rn: u8, rm: u8, num_bits: u8) -> Self {
-        Self { rd: 31, rn, imm6: 0, rm, n: N::No, shift: Shift::LSL, opc: Opc::Ands, sf: num_bits.into() }
+        Self {
+            rd: 31,
+            rn,
+            imm6: 0,
+            rm,
+            n: N::No,
+            shift: Shift::LSL,
+            opc: Opc::Ands,
+            sf: num_bits.into(),
+        }
     }
 }
 
@@ -124,16 +196,15 @@ const FAMILY: u32 = 0b0101;
 impl From<LogicalReg> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: LogicalReg) -> Self {
-        0
-        | ((inst.sf as u32) << 31)
-        | ((inst.opc as u32) << 29)
-        | (FAMILY << 25)
-        | ((inst.shift as u32) << 22)
-        | ((inst.n as u32) << 21)
-        | ((inst.rm as u32) << 16)
-        | (truncate_uimm::<_, 6>(inst.imm6) << 10)
-        | ((inst.rn as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | ((inst.opc as u32) << 29)
+            | (FAMILY << 25)
+            | ((inst.shift as u32) << 22)
+            | ((inst.n as u32) << 21)
+            | ((inst.rm as u32) << 16)
+            | (truncate_uimm::<_, 6>(inst.imm6) << 10)
+            | ((inst.rn as u32) << 5)
+            | inst.rd as u32
     }
 }
 

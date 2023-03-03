@@ -1,4 +1,4 @@
-use super::super::arg::{InstructionOffset, truncate_imm};
+use super::super::arg::{truncate_imm, InstructionOffset};
 
 /// The struct that represents an A64 conditional branch instruction that can be
 /// encoded.
@@ -14,7 +14,7 @@ pub struct BranchCond {
     cond: u8,
 
     /// The instruction offset from this instruction to branch to.
-    offset: InstructionOffset
+    offset: InstructionOffset,
 }
 
 impl BranchCond {
@@ -31,11 +31,7 @@ const FAMILY: u32 = 0b101;
 impl From<BranchCond> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: BranchCond) -> Self {
-        0
-        | (1 << 30)
-        | (FAMILY << 26)
-        | (truncate_imm::<_, 19>(inst.offset) << 5)
-        | (inst.cond as u32)
+        (1 << 30) | (FAMILY << 26) | (truncate_imm::<_, 19>(inst.offset) << 5) | (inst.cond as u32)
     }
 }
 
@@ -49,8 +45,8 @@ impl From<BranchCond> for [u8; 4] {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::super::arg::Condition;
+    use super::*;
 
     #[test]
     fn test_b_eq() {

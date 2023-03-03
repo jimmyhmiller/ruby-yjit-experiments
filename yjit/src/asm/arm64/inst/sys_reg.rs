@@ -6,7 +6,7 @@ enum L {
     MSR = 0,
 
     /// Store the value of a system register in a general-purpose register.
-    MRS = 1
+    MRS = 1,
 }
 
 /// The struct that represents an A64 system register instruction that can be
@@ -27,20 +27,28 @@ pub struct SysReg {
     systemreg: SystemRegister,
 
     /// Which operation to perform (loading or storing the system register value).
-    l: L
+    l: L,
 }
 
 impl SysReg {
     /// MRS (register)
     /// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/MRS--Move-System-Register-?lang=en
     pub fn mrs(rt: u8, systemreg: SystemRegister) -> Self {
-        SysReg { rt, systemreg, l: L::MRS }
+        SysReg {
+            rt,
+            systemreg,
+            l: L::MRS,
+        }
     }
 
     /// MSR (register)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MSR--register---Move-general-purpose-register-to-System-Register-?lang=en
     pub fn msr(systemreg: SystemRegister, rt: u8) -> Self {
-        SysReg { rt, systemreg, l: L::MSR }
+        SysReg {
+            rt,
+            systemreg,
+            l: L::MSR,
+        }
     }
 }
 
@@ -50,11 +58,7 @@ const FAMILY: u32 = 0b110101010001;
 impl From<SysReg> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: SysReg) -> Self {
-        0
-        | (FAMILY << 20)
-        | ((inst.l as u32) << 21)
-        | ((inst.systemreg as u32) << 5)
-        | inst.rt as u32
+        (FAMILY << 20) | ((inst.l as u32) << 21) | ((inst.systemreg as u32) << 5) | inst.rt as u32
     }
 }
 

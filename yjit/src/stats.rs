@@ -4,19 +4,20 @@
 #![allow(dead_code)] // Counters are only used with the stats features
 
 use crate::codegen::CodegenGlobals;
-use crate::core::Context;
 use crate::core::for_each_iseq_payload;
+use crate::core::Context;
 use crate::cruby::*;
 use crate::options::*;
 use crate::yjit::yjit_enabled_p;
 
 // stats_alloc is a middleware to instrument global allocations in Rust.
-#[cfg(feature="stats")]
+#[cfg(feature = "stats")]
 #[global_allocator]
-static GLOBAL_ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> = &stats_alloc::INSTRUMENTED_SYSTEM;
+static GLOBAL_ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> =
+    &stats_alloc::INSTRUMENTED_SYSTEM;
 
 // YJIT exit counts for each instruction type
-const VM_INSTRUCTION_SIZE_USIZE:usize = VM_INSTRUCTION_SIZE as usize;
+const VM_INSTRUCTION_SIZE_USIZE: usize = VM_INSTRUCTION_SIZE as usize;
 static mut EXIT_OP_COUNT: [u64; VM_INSTRUCTION_SIZE_USIZE] = [0; VM_INSTRUCTION_SIZE_USIZE];
 
 /// Global state needed for collecting backtraces of exits
@@ -26,7 +27,7 @@ pub struct YjitExitLocations {
     raw_samples: Vec<VALUE>,
     /// Vec to hold line_samples which represent line numbers of
     /// the iseq caller.
-    line_samples: Vec<i32>
+    line_samples: Vec<i32>,
 }
 
 /// Private singleton instance of yjit exit locations
@@ -47,7 +48,7 @@ impl YjitExitLocations {
 
         let yjit_exit_locations = YjitExitLocations {
             raw_samples: Vec::new(),
-            line_samples: Vec::new()
+            line_samples: Vec::new(),
         };
 
         // Initialize the yjit exit locations instance
@@ -104,7 +105,9 @@ impl YjitExitLocations {
             // Mark the yjit_raw_samples at the given index. These represent
             // the data that needs to be GC'd which are the current frames.
             while i < i32::from(num) {
-                unsafe { rb_gc_mark(yjit_raw_samples[idx as usize]); }
+                unsafe {
+                    rb_gc_mark(yjit_raw_samples[idx as usize]);
+                }
                 i += 1;
                 idx += 1;
             }
@@ -359,11 +362,10 @@ make_counters! {
 /// Check if stats generation is enabled
 #[no_mangle]
 pub extern "C" fn rb_yjit_stats_enabled_p(_ec: EcPtr, _ruby_self: VALUE) -> VALUE {
-
     if get_option!(gen_stats) {
-        return Qtrue;
+        Qtrue
     } else {
-        return Qfalse;
+        Qfalse
     }
 }
 
@@ -385,7 +387,7 @@ pub extern "C" fn rb_yjit_trace_exit_locations_enabled_p(_ec: EcPtr, _ruby_self:
         return Qtrue;
     }
 
-    return Qfalse;
+    Qfalse
 }
 
 /// Call the C function to parse the raw_samples and line_samples
@@ -421,7 +423,11 @@ pub extern "C" fn rb_yjit_get_exit_locations(_ec: EcPtr, _ruby_self: VALUE) -> V
     let samples_len = yjit_raw_samples.len() as i32;
 
     unsafe {
-        rb_yjit_exit_locations_dict(yjit_raw_samples.as_mut_ptr(), yjit_line_samples.as_mut_ptr(), samples_len)
+        rb_yjit_exit_locations_dict(
+            yjit_raw_samples.as_mut_ptr(),
+            yjit_line_samples.as_mut_ptr(),
+            samples_len,
+        )
     }
 }
 
@@ -437,7 +443,7 @@ fn rb_yjit_gen_stats_dict(context: bool) -> VALUE {
             let key = rust_str_to_sym($counter_name);
             let value = VALUE::fixnum_from_usize($value);
             rb_hash_aset($hash, key, value);
-        }
+        };
     }
 
     let hash = unsafe { rb_hash_new() };
@@ -462,7 +468,11 @@ fn rb_yjit_gen_stats_dict(context: bool) -> VALUE {
         hash_aset_usize!(hash, "freed_code_size", freed_page_count * cb.page_size());
 
         // Live pages
-        hash_aset_usize!(hash, "live_page_count", cb.num_mapped_pages() - freed_page_count);
+        hash_aset_usize!(
+            hash,
+            "live_page_count",
+            cb.num_mapped_pages() - freed_page_count
+        );
 
         // Code GC count
         hash_aset_usize!(hash, "code_gc_count", CodegenGlobals::get_code_gc_count());
@@ -471,7 +481,7 @@ fn rb_yjit_gen_stats_dict(context: bool) -> VALUE {
         hash_aset_usize!(hash, "code_region_size", cb.mapped_region_size());
 
         // Rust global allocations in bytes
-        #[cfg(feature="stats")]
+        #[cfg(feature = "stats")]
         hash_aset_usize!(hash, "yjit_alloc_size", global_allocation_size());
 
         if context {
@@ -548,8 +558,7 @@ fn get_live_context_count() -> usize {
 /// and line samples. Their length should be the same, however the data stored in
 /// them is different.
 #[no_mangle]
-pub extern "C" fn rb_yjit_record_exit_stack(exit_pc: *const VALUE)
-{
+pub extern "C" fn rb_yjit_record_exit_stack(exit_pc: *const VALUE) {
     // Return if YJIT is not enabled
     if !yjit_enabled_p() {
         return;
@@ -586,7 +595,14 @@ pub extern "C" fn rb_yjit_record_exit_stack(exit_pc: *const VALUE)
         // Call frame info is stored in the frames_buffer, line number information
         // in the lines_buffer. The first argument is the start point and the second
         // argument is the buffer limit, set at 2048.
-        let stack_length = unsafe { rb_profile_frames(0, BUFF_LEN as i32, frames_buffer.as_mut_ptr(), lines_buffer.as_mut_ptr()) };
+        let stack_length = unsafe {
+            rb_profile_frames(
+                0,
+                BUFF_LEN as i32,
+                frames_buffer.as_mut_ptr(),
+                lines_buffer.as_mut_ptr(),
+            )
+        };
         let samples_length = (stack_length as usize) + 3;
 
         let yjit_raw_samples = YjitExitLocations::get_raw_samples();
@@ -672,7 +688,7 @@ pub extern "C" fn rb_yjit_reset_stats_bang(_ec: EcPtr, _ruby_self: VALUE) -> VAL
         COUNTERS = Counters::default();
     }
 
-    return Qnil;
+    Qnil
 }
 
 /// Increment the number of instructions executed by the interpreter
@@ -703,12 +719,14 @@ pub extern "C" fn rb_yjit_count_side_exit_op(exit_pc: *const VALUE) -> *const VA
     };
 
     // This function must return exit_pc!
-    return exit_pc;
+    exit_pc
 }
 
 // Get the size of global allocations in Rust.
-#[cfg(feature="stats")]
+#[cfg(feature = "stats")]
 fn global_allocation_size() -> usize {
     let stats = GLOBAL_ALLOCATOR.stats();
-    stats.bytes_allocated.saturating_sub(stats.bytes_deallocated)
+    stats
+        .bytes_allocated
+        .saturating_sub(stats.bytes_deallocated)
 }

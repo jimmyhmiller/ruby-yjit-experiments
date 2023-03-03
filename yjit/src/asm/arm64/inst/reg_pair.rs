@@ -6,7 +6,7 @@ enum Opc {
     Opc32 = 0b00,
 
     /// When the registers are 64-bits wide.
-    Opc64 = 0b10
+    Opc64 = 0b10,
 }
 
 /// The kind of indexing to perform for this instruction.
@@ -16,7 +16,7 @@ enum Index {
     StoreSignedOffset = 0b100,
     LoadSignedOffset = 0b101,
     StorePreIndex = 0b110,
-    LoadPreIndex = 0b111
+    LoadPreIndex = 0b111,
 }
 
 /// A convenience function so that we can convert the number of bits of a
@@ -26,7 +26,7 @@ impl From<u8> for Opc {
         match num_bits {
             64 => Opc::Opc64,
             32 => Opc::Opc32,
-            _ => panic!("Invalid number of bits: {}", num_bits)
+            _ => panic!("Invalid number of bits: {}", num_bits),
         }
     }
 }
@@ -58,13 +58,20 @@ pub struct RegisterPair {
     index: Index,
 
     /// The operation to be performed (in terms of size).
-    opc: Opc
+    opc: Opc,
 }
 
 impl RegisterPair {
     /// Create a register pair instruction with a given indexing mode.
     fn new(rt1: u8, rt2: u8, rn: u8, disp: i16, index: Index, num_bits: u8) -> Self {
-        Self { rt1, rn, rt2, imm7: disp / 8, index, opc: num_bits.into() }
+        Self {
+            rt1,
+            rn,
+            rt2,
+            imm7: disp / 8,
+            index,
+            opc: num_bits.into(),
+        }
     }
 
     /// LDP (signed offset)
@@ -116,15 +123,14 @@ const FAMILY: u32 = 0b0100;
 impl From<RegisterPair> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: RegisterPair) -> Self {
-        0
-        | ((inst.opc as u32) << 30)
-        | (1 << 29)
-        | (FAMILY << 25)
-        | ((inst.index as u32) << 22)
-        | (truncate_imm::<_, 7>(inst.imm7) << 15)
-        | ((inst.rt2 as u32) << 10)
-        | ((inst.rn as u32) << 5)
-        | (inst.rt1 as u32)
+        ((inst.opc as u32) << 30)
+            | (1 << 29)
+            | (FAMILY << 25)
+            | ((inst.index as u32) << 22)
+            | (truncate_imm::<_, 7>(inst.imm7) << 15)
+            | ((inst.rt2 as u32) << 10)
+            | ((inst.rn as u32) << 5)
+            | (inst.rt1 as u32)
     }
 }
 

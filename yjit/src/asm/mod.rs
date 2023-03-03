@@ -1,22 +1,22 @@
+#[cfg(target_arch = "aarch64")]
+use crate::backend::arm64::JMP_PTR_BYTES;
+#[cfg(target_arch = "x86_64")]
+use crate::backend::x86_64::JMP_PTR_BYTES;
+use crate::core::for_each_off_stack_iseq_payload;
+use crate::core::for_each_on_stack_iseq_payload;
+use crate::core::IseqPayload;
+use crate::invariants::rb_yjit_tracing_invalidate_all;
+use crate::virtualmem::WriteError;
 use std::cell::RefCell;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
-#[cfg(target_arch = "x86_64")]
-use crate::backend::x86_64::JMP_PTR_BYTES;
-#[cfg(target_arch = "aarch64")]
-use crate::backend::arm64::JMP_PTR_BYTES;
-use crate::core::IseqPayload;
-use crate::core::for_each_off_stack_iseq_payload;
-use crate::core::for_each_on_stack_iseq_payload;
-use crate::invariants::rb_yjit_tracing_invalidate_all;
-use crate::virtualmem::WriteError;
 
 #[cfg(feature = "disasm")]
 use std::collections::BTreeMap;
 
 use crate::codegen::CodegenGlobals;
-use crate::virtualmem::{VirtualMem, CodePtr};
+use crate::virtualmem::{CodePtr, VirtualMem};
 
 // Lots of manual vertical alignment in there that rustfmt doesn't handle well.
 #[rustfmt::skip]
@@ -43,7 +43,7 @@ pub struct LabelRef {
     num_bytes: usize,
 
     /// The object that knows how to encode the branch instruction.
-    encode: fn(&mut CodeBlock, i64, i64)
+    encode: fn(&mut CodeBlock, i64, i64),
 }
 
 /// Block of memory into which instructions can be assembled
@@ -104,7 +104,11 @@ impl CodeBlock {
     const PREFERRED_CODE_PAGE_SIZE: usize = 16 * 1024;
 
     /// Make a new CodeBlock
-    pub fn new(mem_block: Rc<RefCell<VirtualMem>>, outlined: bool, freed_pages: Rc<Option<Vec<usize>>>) -> Self {
+    pub fn new(
+        mem_block: Rc<RefCell<VirtualMem>>,
+        outlined: bool,
+        freed_pages: Rc<Option<Vec<usize>>>,
+    ) -> Self {
         // Pick the code page size
         let system_page_size = mem_block.borrow().system_page_size();
         let page_size = if 0 == Self::PREFERRED_CODE_PAGE_SIZE % system_page_size {
@@ -135,14 +139,21 @@ impl CodeBlock {
 
     /// Move the CodeBlock to the next page. If it's on the furthest page,
     /// move the other CodeBlock to the next page as well.
-    pub fn next_page<F: Fn(&mut CodeBlock, CodePtr)>(&mut self, base_ptr: CodePtr, jmp_ptr: F) -> bool {
+    pub fn next_page<F: Fn(&mut CodeBlock, CodePtr)>(
+        &mut self,
+        base_ptr: CodePtr,
+        jmp_ptr: F,
+    ) -> bool {
         let old_write_ptr = self.get_write_ptr();
         self.set_write_ptr(base_ptr);
 
         // Use the freed_pages list if code GC has been used. Otherwise use the next page.
         let next_page_idx = if let Some(freed_pages) = self.freed_pages.as_ref() {
             let current_page = self.write_pos / self.page_size;
-            freed_pages.iter().find(|&&page| current_page < page).map(|&page| page)
+            freed_pages
+                .iter()
+                .find(|&&page| current_page < page)
+                .copied()
         } else {
             Some(self.write_pos / self.page_size + 1)
         };
@@ -155,9 +166,11 @@ impl CodeBlock {
 
         // Move the other CodeBlock to the same page if it's on the furthest page
         #[cfg(not(test))]
-        self.other_cb().unwrap().set_page(next_page_idx.unwrap(), &jmp_ptr);
+        self.other_cb()
+            .unwrap()
+            .set_page(next_page_idx.unwrap(), &jmp_ptr);
 
-        return !self.dropped_bytes;
+        !self.dropped_bytes
     }
 
     /// Move the CodeBlock to page_idx only if it's not going backwards.
@@ -220,9 +233,15 @@ impl CodeBlock {
             }
 
             // Free the grouped pages at once
-            let start_ptr = self.mem_block.borrow().start_ptr().add_bytes(page_idx * self.page_size);
+            let start_ptr = self
+                .mem_block
+                .borrow()
+                .start_ptr()
+                .add_bytes(page_idx * self.page_size);
             let batch_size = self.page_size * batch_idxs.len();
-            self.mem_block.borrow_mut().free_bytes(start_ptr, batch_size as u32);
+            self.mem_block
+                .borrow_mut()
+                .free_bytes(start_ptr, batch_size as u32);
         }
     }
 
@@ -251,7 +270,9 @@ impl CodeBlock {
 
     /// Return the number of code pages that have been freed and not used yet.
     pub fn num_freed_pages(&self) -> usize {
-        (0..self.num_mapped_pages()).filter(|&page_idx| self.has_freed_page(page_idx)).count()
+        (0..self.num_mapped_pages())
+            .filter(|&page_idx| self.has_freed_page(page_idx))
+            .count()
     }
 
     pub fn has_freed_page(&self, page_idx: usize) -> bool {
@@ -271,11 +292,7 @@ impl CodeBlock {
 
     /// Offset of each page where CodeBlock should start writing
     pub fn page_start(&self) -> usize {
-        let mut start = if self.inline() {
-            0
-        } else {
-            self.page_size / 2
-        };
+        let mut start = if self.inline() { 0 } else { self.page_size / 2 };
         if cfg!(debug_assertions) && !cfg!(test) {
             // Leave illegal instructions at the beginning of each page to assert
             // we're not accidentally crossing page boundaries.
@@ -446,7 +463,13 @@ impl CodeBlock {
     /// Write a single byte at the current position.
     pub fn write_byte(&mut self, byte: u8) {
         let write_ptr = self.get_write_ptr();
-        if self.has_capacity(1) && self.mem_block.borrow_mut().write_byte(write_ptr, byte).is_ok() {
+        if self.has_capacity(1)
+            && self
+                .mem_block
+                .borrow_mut()
+                .write_byte(write_ptr, byte)
+                .is_ok()
+        {
             self.write_pos += 1;
         } else {
             self.dropped_bytes = true;
@@ -500,13 +523,16 @@ impl CodeBlock {
 
     /// Allocate a new label with a given name
     pub fn new_label(&mut self, name: String) -> usize {
-        assert!(!name.contains(' '), "use underscores in label names, not spaces");
+        assert!(
+            !name.contains(' '),
+            "use underscores in label names, not spaces"
+        );
 
         // This label doesn't have an address yet
         self.label_addrs.push(0);
         self.label_names.push(name);
 
-        return self.label_addrs.len() - 1;
+        self.label_addrs.len() - 1
     }
 
     /// Write a label at the current address
@@ -515,11 +541,21 @@ impl CodeBlock {
     }
 
     // Add a label reference at the current write position
-    pub fn label_ref(&mut self, label_idx: usize, num_bytes: usize, encode: fn(&mut CodeBlock, i64, i64)) {
+    pub fn label_ref(
+        &mut self,
+        label_idx: usize,
+        num_bytes: usize,
+        encode: fn(&mut CodeBlock, i64, i64),
+    ) {
         assert!(label_idx < self.label_addrs.len());
 
         // Keep track of the reference
-        self.label_refs.push(LabelRef { pos: self.write_pos, label_idx, num_bytes, encode });
+        self.label_refs.push(LabelRef {
+            pos: self.write_pos,
+            label_idx,
+            num_bytes,
+            encode,
+        });
 
         // Move past however many bytes the instruction takes up
         if self.has_capacity(num_bytes) {
@@ -543,7 +579,11 @@ impl CodeBlock {
             assert!(label_addr < self.mem_size);
 
             self.set_pos(ref_pos);
-            (label_ref.encode)(self, (ref_pos + label_ref.num_bytes) as i64, label_addr as i64);
+            (label_ref.encode)(
+                self,
+                (ref_pos + label_ref.num_bytes) as i64,
+                label_addr as i64,
+            );
 
             // Assert that we've written the same number of bytes that we
             // expected to have written.
@@ -620,14 +660,19 @@ impl CodeBlock {
         );
 
         // Let VirtuamMem free the pages
-        let mut freed_pages: Vec<usize> = pages_in_use.iter().enumerate()
-            .filter(|&(_, &in_use)| !in_use).map(|(page, _)| page).collect();
+        let mut freed_pages: Vec<usize> = pages_in_use
+            .iter()
+            .enumerate()
+            .filter(|&(_, &in_use)| !in_use)
+            .map(|(page, _)| page)
+            .collect();
         // ObjectSpace API may trigger Ruby's GC, which marks gc_offsets in JIT code.
         // So this should be called after for_each_*_iseq_payload and rb_yjit_tracing_invalidate_all.
         self.free_pages(&freed_pages);
 
         // Append virtual pages in case RubyVM::YJIT.code_gc is manually triggered.
-        let mut virtual_pages: Vec<usize> = (self.num_mapped_pages()..self.num_virtual_pages()).collect();
+        let mut virtual_pages: Vec<usize> =
+            (self.num_mapped_pages()..self.num_virtual_pages()).collect();
         freed_pages.append(&mut virtual_pages);
 
         if let Some(&first_page) = freed_pages.first() {
@@ -670,32 +715,48 @@ impl CodeBlock {
 impl CodeBlock {
     /// Stubbed CodeBlock for testing. Can't execute generated code.
     pub fn new_dummy(mem_size: usize) -> Self {
-        use std::ptr::NonNull;
-        use crate::virtualmem::*;
         use crate::virtualmem::tests::TestingAllocator;
+        use crate::virtualmem::*;
+        use std::ptr::NonNull;
 
         let alloc = TestingAllocator::new(mem_size);
         let mem_start: *const u8 = alloc.mem_start();
-        let virt_mem = VirtualMem::new(alloc, 1, NonNull::new(mem_start as *mut u8).unwrap(), mem_size);
+        let virt_mem = VirtualMem::new(
+            alloc,
+            1,
+            NonNull::new(mem_start as *mut u8).unwrap(),
+            mem_size,
+        );
 
         Self::new(Rc::new(RefCell::new(virt_mem)), false, Rc::new(None))
     }
 
     /// Stubbed CodeBlock for testing conditions that can arise due to code GC. Can't execute generated code.
     pub fn new_dummy_with_freed_pages(mut freed_pages: Vec<usize>) -> Self {
-        use std::ptr::NonNull;
-        use crate::virtualmem::*;
         use crate::virtualmem::tests::TestingAllocator;
+        use crate::virtualmem::*;
+        use std::ptr::NonNull;
 
         freed_pages.sort_unstable();
-        let mem_size = Self::PREFERRED_CODE_PAGE_SIZE *
-            (1 + freed_pages.last().expect("freed_pages vec should not be empty"));
+        let mem_size = Self::PREFERRED_CODE_PAGE_SIZE
+            * (1 + freed_pages
+                .last()
+                .expect("freed_pages vec should not be empty"));
 
         let alloc = TestingAllocator::new(mem_size);
         let mem_start: *const u8 = alloc.mem_start();
-        let virt_mem = VirtualMem::new(alloc, 1, NonNull::new(mem_start as *mut u8).unwrap(), mem_size);
+        let virt_mem = VirtualMem::new(
+            alloc,
+            1,
+            NonNull::new(mem_start as *mut u8).unwrap(),
+            mem_size,
+        );
 
-        Self::new(Rc::new(RefCell::new(virt_mem)), false, Rc::new(Some(freed_pages)))
+        Self::new(
+            Rc::new(RefCell::new(virt_mem)),
+            false,
+            Rc::new(Some(freed_pages)),
+        )
     }
 }
 
@@ -703,7 +764,14 @@ impl CodeBlock {
 impl fmt::LowerHex for CodeBlock {
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
         for pos in 0..self.write_pos {
-            let byte = unsafe { self.mem_block.borrow().start_ptr().raw_ptr().add(pos).read() };
+            let byte = unsafe {
+                self.mem_block
+                    .borrow()
+                    .start_ptr()
+                    .raw_ptr()
+                    .add(pos)
+                    .read()
+            };
             fmtr.write_fmt(format_args!("{:02x}", byte))?;
         }
         Ok(())
@@ -719,7 +787,7 @@ pub struct OutlinedCb {
 
 impl OutlinedCb {
     pub fn wrap(cb: CodeBlock) -> Self {
-        OutlinedCb { cb: cb }
+        OutlinedCb { cb }
     }
 
     pub fn unwrap(&mut self) -> &mut CodeBlock {
@@ -728,8 +796,7 @@ impl OutlinedCb {
 }
 
 /// Compute the number of bits needed to encode a signed value
-pub fn imm_num_bits(imm: i64) -> u8
-{
+pub fn imm_num_bits(imm: i64) -> u8 {
     // Compute the smallest size this immediate fits in
     if imm >= i8::MIN.into() && imm <= i8::MAX.into() {
         return 8;
@@ -741,34 +808,29 @@ pub fn imm_num_bits(imm: i64) -> u8
         return 32;
     }
 
-    return 64;
+    64
 }
 
 /// Compute the number of bits needed to encode an unsigned value
-pub fn uimm_num_bits(uimm: u64) -> u8
-{
+pub fn uimm_num_bits(uimm: u64) -> u8 {
     // Compute the smallest size this immediate fits in
     if uimm <= u8::MAX.into() {
         return 8;
-    }
-    else if uimm <= u16::MAX.into() {
+    } else if uimm <= u16::MAX.into() {
         return 16;
-    }
-    else if uimm <= u32::MAX.into() {
+    } else if uimm <= u32::MAX.into() {
         return 32;
     }
 
-    return 64;
+    64
 }
 
 #[cfg(test)]
-mod tests
-{
+mod tests {
     use super::*;
 
     #[test]
-    fn test_imm_num_bits()
-    {
+    fn test_imm_num_bits() {
         assert_eq!(imm_num_bits(i8::MIN.into()), 8);
         assert_eq!(imm_num_bits(i8::MAX.into()), 8);
 

@@ -12,7 +12,7 @@ enum Opc {
     Eor = 0b10,
 
     /// The ANDS operation.
-    Ands = 0b11
+    Ands = 0b11,
 }
 
 /// The struct that represents an A64 bitwise immediate instruction that can be
@@ -39,38 +39,68 @@ pub struct LogicalImm {
     opc: Opc,
 
     /// Whether or not this instruction is operating on 64-bit operands.
-    sf: Sf
+    sf: Sf,
 }
 
 impl LogicalImm {
     /// AND (bitmask immediate)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/AND--immediate---Bitwise-AND--immediate--?lang=en
     pub fn and(rd: u8, rn: u8, imm: BitmaskImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, opc: Opc::And, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            opc: Opc::And,
+            sf: num_bits.into(),
+        }
     }
 
     /// ANDS (bitmask immediate)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ANDS--immediate---Bitwise-AND--immediate---setting-flags-?lang=en
     pub fn ands(rd: u8, rn: u8, imm: BitmaskImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, opc: Opc::Ands, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            opc: Opc::Ands,
+            sf: num_bits.into(),
+        }
     }
 
     /// EOR (bitmask immediate)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/EOR--immediate---Bitwise-Exclusive-OR--immediate--
     pub fn eor(rd: u8, rn: u8, imm: BitmaskImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, opc: Opc::Eor, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            opc: Opc::Eor,
+            sf: num_bits.into(),
+        }
     }
 
     /// MOV (bitmask immediate)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/MOV--bitmask-immediate---Move--bitmask-immediate---an-alias-of-ORR--immediate--?lang=en
     pub fn mov(rd: u8, imm: BitmaskImmediate, num_bits: u8) -> Self {
-        Self { rd, rn: 0b11111, imm, opc: Opc::Orr, sf: num_bits.into() }
+        Self {
+            rd,
+            rn: 0b11111,
+            imm,
+            opc: Opc::Orr,
+            sf: num_bits.into(),
+        }
     }
 
     /// ORR (bitmask immediate)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/ORR--immediate---Bitwise-OR--immediate--
     pub fn orr(rd: u8, rn: u8, imm: BitmaskImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, opc: Opc::Orr, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            opc: Opc::Orr,
+            sf: num_bits.into(),
+        }
     }
 
     /// TST (bitmask immediate)
@@ -88,13 +118,12 @@ impl From<LogicalImm> for u32 {
     fn from(inst: LogicalImm) -> Self {
         let imm: u32 = inst.imm.encode();
 
-        0
-        | ((inst.sf as u32) << 31)
-        | ((inst.opc as u32) << 29)
-        | (FAMILY << 25)
-        | (imm << 10)
-        | ((inst.rn as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | ((inst.opc as u32) << 29)
+            | (FAMILY << 25)
+            | (imm << 10)
+            | ((inst.rn as u32) << 5)
+            | inst.rd as u32
     }
 }
 

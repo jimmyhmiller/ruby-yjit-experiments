@@ -1,7 +1,7 @@
 /// How much to shift the immediate by.
 pub enum Shift {
-    LSL0 = 0b0, // no shift
-    LSL12 = 0b1 // logical shift left by 12 bits
+    LSL0 = 0b0,  // no shift
+    LSL12 = 0b1, // logical shift left by 12 bits
 }
 
 /// Some instructions accept a 12-bit immediate that has an optional shift
@@ -10,7 +10,7 @@ pub enum Shift {
 /// to bail out.
 pub struct ShiftedImmediate {
     shift: Shift,
-    value: u16
+    value: u16,
 }
 
 impl TryFrom<u64> for ShiftedImmediate {
@@ -20,11 +20,17 @@ impl TryFrom<u64> for ShiftedImmediate {
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         let current = value;
         if current < 2_u64.pow(12) {
-            return Ok(ShiftedImmediate { shift: Shift::LSL0, value: current as u16 });
+            return Ok(ShiftedImmediate {
+                shift: Shift::LSL0,
+                value: current as u16,
+            });
         }
 
         if (current & (2_u64.pow(12) - 1) == 0) && ((current >> 12) < 2_u64.pow(12)) {
-            return Ok(ShiftedImmediate { shift: Shift::LSL12, value: (current >> 12) as u16 });
+            return Ok(ShiftedImmediate {
+                shift: Shift::LSL12,
+                value: (current >> 12) as u16,
+            });
         }
 
         Err(())
@@ -34,9 +40,7 @@ impl TryFrom<u64> for ShiftedImmediate {
 impl From<ShiftedImmediate> for u32 {
     /// Encode a bitmask immediate into a 32-bit value.
     fn from(imm: ShiftedImmediate) -> Self {
-        0
-        | (((imm.shift as u32) & 1) << 12)
-        | (imm.value as u32)
+        (((imm.shift as u32) & 1) << 12) | (imm.value as u32)
     }
 }
 
@@ -50,8 +54,11 @@ mod tests {
         let result = ShiftedImmediate::try_from(expected_value);
 
         match result {
-            Ok(ShiftedImmediate { shift: Shift::LSL0, value }) => assert_eq!(value as u64, expected_value),
-            _ => panic!("Unexpected shift value")
+            Ok(ShiftedImmediate {
+                shift: Shift::LSL0,
+                value,
+            }) => assert_eq!(value as u64, expected_value),
+            _ => panic!("Unexpected shift value"),
         }
     }
 
@@ -61,8 +68,11 @@ mod tests {
         let result = ShiftedImmediate::try_from(expected_value);
 
         match result {
-            Ok(ShiftedImmediate { shift: Shift::LSL0, value }) => assert_eq!(value as u64, expected_value),
-            _ => panic!("Unexpected shift value")
+            Ok(ShiftedImmediate {
+                shift: Shift::LSL0,
+                value,
+            }) => assert_eq!(value as u64, expected_value),
+            _ => panic!("Unexpected shift value"),
         }
     }
 
@@ -70,7 +80,13 @@ mod tests {
     fn test_with_shift() {
         let result = ShiftedImmediate::try_from(256 << 12);
 
-        assert!(matches!(result, Ok(ShiftedImmediate { shift: Shift::LSL12, value: 256 })));
+        assert!(matches!(
+            result,
+            Ok(ShiftedImmediate {
+                shift: Shift::LSL12,
+                value: 256
+            })
+        ));
     }
 
     #[test]

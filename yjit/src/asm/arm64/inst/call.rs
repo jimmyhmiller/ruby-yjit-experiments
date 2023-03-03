@@ -1,4 +1,4 @@
-use super::super::arg::{InstructionOffset, truncate_imm};
+use super::super::arg::{truncate_imm, InstructionOffset};
 
 /// The operation to perform for this instruction.
 enum Op {
@@ -7,7 +7,7 @@ enum Op {
     Branch = 0,
 
     /// Branch directly, with a hint that this is a subroutine call or return.
-    BranchWithLink = 1
+    BranchWithLink = 1,
 }
 
 /// The struct that represents an A64 branch with our without link instruction
@@ -24,20 +24,26 @@ pub struct Call {
     offset: InstructionOffset,
 
     /// The operation to perform for this instruction.
-    op: Op
+    op: Op,
 }
 
 impl Call {
     /// B
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch-
     pub fn b(offset: InstructionOffset) -> Self {
-        Self { offset, op: Op::Branch }
+        Self {
+            offset,
+            op: Op::Branch,
+        }
     }
 
     /// BL
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/BL--Branch-with-Link-?lang=en
     pub fn bl(offset: InstructionOffset) -> Self {
-        Self { offset, op: Op::BranchWithLink }
+        Self {
+            offset,
+            op: Op::BranchWithLink,
+        }
     }
 }
 
@@ -47,10 +53,7 @@ const FAMILY: u32 = 0b101;
 impl From<Call> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: Call) -> Self {
-        0
-        | ((inst.op as u32) << 31)
-        | (FAMILY << 26)
-        | truncate_imm::<_, 26>(inst.offset)
+        ((inst.op as u32) << 31) | (FAMILY << 26) | truncate_imm::<_, 26>(inst.offset)
     }
 }
 

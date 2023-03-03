@@ -6,7 +6,7 @@ enum Op {
     MOVZ = 0b10,
 
     /// A movk operation which keeps the other bits in place.
-    MOVK = 0b11
+    MOVK = 0b11,
 }
 
 /// How much to shift the immediate by.
@@ -14,7 +14,7 @@ enum Hw {
     LSL0 = 0b00,
     LSL16 = 0b01,
     LSL32 = 0b10,
-    LSL48 = 0b11
+    LSL48 = 0b11,
 }
 
 impl From<u8> for Hw {
@@ -24,7 +24,7 @@ impl From<u8> for Hw {
             16 => Hw::LSL16,
             32 => Hw::LSL32,
             48 => Hw::LSL48,
-            _ => panic!("Invalid value for shift: {}", shift)
+            _ => panic!("Invalid value for shift: {}", shift),
         }
     }
 }
@@ -51,20 +51,32 @@ pub struct Mov {
     op: Op,
 
     /// Whether or not this instruction is operating on 64-bit operands.
-    sf: Sf
+    sf: Sf,
 }
 
 impl Mov {
     /// MOVK
     /// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/MOVK--Move-wide-with-keep-?lang=en
     pub fn movk(rd: u8, imm16: u16, hw: u8, num_bits: u8) -> Self {
-        Self { rd, imm16, hw: hw.into(), op: Op::MOVK, sf: num_bits.into() }
+        Self {
+            rd,
+            imm16,
+            hw: hw.into(),
+            op: Op::MOVK,
+            sf: num_bits.into(),
+        }
     }
 
     /// MOVZ
     /// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/MOVZ--Move-wide-with-zero-?lang=en
     pub fn movz(rd: u8, imm16: u16, hw: u8, num_bits: u8) -> Self {
-        Self { rd, imm16, hw: hw.into(), op: Op::MOVZ, sf: num_bits.into() }
+        Self {
+            rd,
+            imm16,
+            hw: hw.into(),
+            op: Op::MOVZ,
+            sf: num_bits.into(),
+        }
     }
 }
 
@@ -74,14 +86,13 @@ const FAMILY: u32 = 0b1000;
 impl From<Mov> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: Mov) -> Self {
-        0
-        | ((inst.sf as u32) << 31)
-        | ((inst.op as u32) << 29)
-        | (FAMILY << 25)
-        | (0b101 << 23)
-        | ((inst.hw as u32) << 21)
-        | ((inst.imm16 as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | ((inst.op as u32) << 29)
+            | (FAMILY << 25)
+            | (0b101 << 23)
+            | ((inst.hw as u32) << 21)
+            | ((inst.imm16 as u32) << 5)
+            | inst.rd as u32
     }
 }
 

@@ -7,7 +7,7 @@ enum Op {
     BLR = 0b01,
 
     /// Perform a RET instruction.
-    RET = 0b10
+    RET = 0b10,
 }
 
 /// The struct that represents an A64 branch instruction that can be encoded.
@@ -23,7 +23,7 @@ pub struct Branch {
     rn: u8,
 
     /// The operation to perform.
-    op: Op
+    op: Op,
 }
 
 impl Branch {
@@ -52,13 +52,12 @@ const FAMILY: u32 = 0b101;
 impl From<Branch> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: Branch) -> Self {
-        0
-        | (0b11 << 30)
-        | (FAMILY << 26)
-        | (1 << 25)
-        | ((inst.op as u32) << 21)
-        | (0b11111 << 16)
-        | ((inst.rn as u32) << 5)
+        (0b11 << 30)
+            | (FAMILY << 26)
+            | (1 << 25)
+            | ((inst.op as u32) << 21)
+            | (0b11111 << 16)
+            | ((inst.rn as u32) << 5)
     }
 }
 

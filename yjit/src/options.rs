@@ -114,7 +114,7 @@ pub fn parse_option(str_ptr: *const std::os::raw::c_char) -> Option<()> {
         ("exec-mem-size", _) => match opt_val.parse::<usize>() {
             Ok(n) => {
                 if n == 0 || n > 2 * 1024 * 1024 {
-                    return None
+                    return None;
                 }
 
                 // Convert from MiB to bytes internally for convenience
@@ -147,7 +147,7 @@ pub fn parse_option(str_ptr: *const std::os::raw::c_char) -> Option<()> {
                 println!("YJIT disasm dump: {path}");
                 unsafe { OPTIONS.dump_disasm = Some(DumpDisasm::File(path)) }
             }
-         },
+        },
 
         ("dump-iseq-disasm", _) => unsafe {
             OPTIONS.dump_iseq_disasm = Some(opt_val.to_string());
@@ -156,7 +156,10 @@ pub fn parse_option(str_ptr: *const std::os::raw::c_char) -> Option<()> {
         ("greedy-versioning", "") => unsafe { OPTIONS.greedy_versioning = true },
         ("no-type-prop", "") => unsafe { OPTIONS.no_type_prop = true },
         ("stats", "") => unsafe { OPTIONS.gen_stats = true },
-        ("trace-exits", "") => unsafe { OPTIONS.gen_trace_exits = true; OPTIONS.gen_stats = true },
+        ("trace-exits", "") => unsafe {
+            OPTIONS.gen_trace_exits = true;
+            OPTIONS.gen_stats = true
+        },
         ("dump-insns", "") => unsafe { OPTIONS.dump_insns = true },
         ("verify-ctx", "") => unsafe { OPTIONS.verify_ctx = true },
         ("global-constant-state", "") => unsafe { OPTIONS.global_constant_state = true },
@@ -170,5 +173,5 @@ pub fn parse_option(str_ptr: *const std::os::raw::c_char) -> Option<()> {
     // dbg!(unsafe {OPTIONS});
 
     // Option successfully parsed
-    return Some(());
+    Some(())
 }

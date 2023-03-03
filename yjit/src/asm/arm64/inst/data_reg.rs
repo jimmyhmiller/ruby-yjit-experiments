@@ -1,22 +1,22 @@
-use super::super::arg::{Sf, truncate_uimm};
+use super::super::arg::{truncate_uimm, Sf};
 
 /// The operation being performed by this instruction.
 enum Op {
     Add = 0b0,
-    Sub = 0b1
+    Sub = 0b1,
 }
 
 // Whether or not to update the flags when this instruction is performed.
 enum S {
     LeaveFlags = 0b0,
-    UpdateFlags = 0b1
+    UpdateFlags = 0b1,
 }
 
 /// The type of shift to perform on the second operand register.
 enum Shift {
     LSL = 0b00, // logical shift left (unsigned)
     LSR = 0b01, // logical shift right (unsigned)
-    ASR = 0b10  // arithmetic shift right (signed)
+    ASR = 0b10, // arithmetic shift right (signed)
 }
 
 /// The struct that represents an A64 data processing -- register instruction
@@ -52,7 +52,7 @@ pub struct DataReg {
     op: Op,
 
     /// Whether or not this instruction is operating on 64-bit operands.
-    sf: Sf
+    sf: Sf,
 }
 
 impl DataReg {
@@ -67,7 +67,7 @@ impl DataReg {
             shift: Shift::LSL,
             s: S::LeaveFlags,
             op: Op::Add,
-            sf: num_bits.into()
+            sf: num_bits.into(),
         }
     }
 
@@ -82,7 +82,7 @@ impl DataReg {
             shift: Shift::LSL,
             s: S::UpdateFlags,
             op: Op::Add,
-            sf: num_bits.into()
+            sf: num_bits.into(),
         }
     }
 
@@ -103,7 +103,7 @@ impl DataReg {
             shift: Shift::LSL,
             s: S::LeaveFlags,
             op: Op::Sub,
-            sf: num_bits.into()
+            sf: num_bits.into(),
         }
     }
 
@@ -118,7 +118,7 @@ impl DataReg {
             shift: Shift::LSL,
             s: S::UpdateFlags,
             op: Op::Sub,
-            sf: num_bits.into()
+            sf: num_bits.into(),
         }
     }
 }
@@ -129,17 +129,16 @@ const FAMILY: u32 = 0b0101;
 impl From<DataReg> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: DataReg) -> Self {
-        0
-        | ((inst.sf as u32) << 31)
-        | ((inst.op as u32) << 30)
-        | ((inst.s as u32) << 29)
-        | (FAMILY << 25)
-        | (1 << 24)
-        | ((inst.shift as u32) << 22)
-        | ((inst.rm as u32) << 16)
-        | (truncate_uimm::<_, 6>(inst.imm6) << 10)
-        | ((inst.rn as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | ((inst.op as u32) << 30)
+            | ((inst.s as u32) << 29)
+            | (FAMILY << 25)
+            | (1 << 24)
+            | ((inst.shift as u32) << 22)
+            | ((inst.rm as u32) << 16)
+            | (truncate_uimm::<_, 6>(inst.imm6) << 10)
+            | ((inst.rn as u32) << 5)
+            | inst.rd as u32
     }
 }
 

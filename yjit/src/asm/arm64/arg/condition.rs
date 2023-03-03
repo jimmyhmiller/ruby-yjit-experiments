@@ -45,8 +45,7 @@ impl Condition {
 
             Condition::AL => Condition::AL,
 
-            _ => panic!("Unknown condition")
-
+            _ => panic!("Unknown condition"),
         }
     }
 }

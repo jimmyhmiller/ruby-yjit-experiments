@@ -1,12 +1,12 @@
-use crate::core::*;
-use crate::cruby::*;
-use crate::yjit::yjit_enabled_p;
 #[cfg(feature = "disasm")]
 use crate::asm::CodeBlock;
 #[cfg(feature = "disasm")]
 use crate::codegen::CodePtr;
+use crate::core::*;
+use crate::cruby::*;
 #[cfg(feature = "disasm")]
 use crate::options::DumpDisasm;
+use crate::yjit::yjit_enabled_p;
 
 #[cfg(feature = "disasm")]
 use std::fmt::Write;
@@ -18,7 +18,7 @@ pub extern "C" fn rb_yjit_disasm_iseq(_ec: EcPtr, _ruby_self: VALUE, iseqw: VALU
     #[cfg(not(feature = "disasm"))]
     {
         let _ = iseqw;
-        return Qnil;
+        Qnil
     }
 
     #[cfg(feature = "disasm")]
@@ -77,7 +77,7 @@ pub fn disasm_iseq_insn_range(iseq: IseqPtr, start_idx: u32, end_idx: u32) -> St
     }
 
     writeln!(out, "NUM BLOCK VERSIONS: {}", block_list.len()).unwrap();
-    writeln!(out,  "TOTAL INLINE CODE SIZE: {} bytes", total_code_size).unwrap();
+    writeln!(out, "TOTAL INLINE CODE SIZE: {} bytes", total_code_size).unwrap();
 
     // For each block, sorted by increasing start address
     for block_idx in 0..block_list.len() {
@@ -126,7 +126,12 @@ pub fn disasm_iseq_insn_range(iseq: IseqPtr, start_idx: u32, end_idx: u32) -> St
 }
 
 #[cfg(feature = "disasm")]
-pub fn dump_disasm_addr_range(cb: &CodeBlock, start_addr: CodePtr, end_addr: CodePtr, dump_disasm: &DumpDisasm) {
+pub fn dump_disasm_addr_range(
+    cb: &CodeBlock,
+    start_addr: CodePtr,
+    end_addr: CodePtr,
+    dump_disasm: &DumpDisasm,
+) {
     use std::fs::File;
     use std::io::Write;
 
@@ -136,7 +141,11 @@ pub fn dump_disasm_addr_range(cb: &CodeBlock, start_addr: CodePtr, end_addr: Cod
             match dump_disasm {
                 DumpDisasm::Stdout => println!("{disasm}"),
                 DumpDisasm::File(path) => {
-                    let mut f = File::options().create(true).append(true).open(path).unwrap();
+                    let mut f = File::options()
+                        .create(true)
+                        .append(true)
+                        .open(path)
+                        .unwrap();
                     f.write_all(disasm.as_bytes()).unwrap();
                 }
             };
@@ -223,12 +232,12 @@ pub extern "C" fn rb_yjit_insns_compiled(_ec: EcPtr, _ruby_self: VALUE, iseqw: V
                 let op_name = &insn_vec[idx].0;
                 let insn_idx = insn_vec[idx].1;
 
-                let op_sym = rust_str_to_sym(&op_name);
+                let op_sym = rust_str_to_sym(op_name);
 
                 // Store the instruction index and opcode symbol
                 rb_ary_store(
                     insn_ary,
-                    (2 * idx + 0) as i64,
+                    2 * idx as i64,
                     VALUE::fixnum_from_usize(insn_idx as usize),
                 );
                 rb_ary_store(insn_ary, (2 * idx + 1) as i64, op_sym);
@@ -273,5 +282,5 @@ fn insns_compiled(iseq: IseqPtr) -> Vec<(String, u32)> {
         }
     }
 
-    return insn_vec;
+    insn_vec
 }

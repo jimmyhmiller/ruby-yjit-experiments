@@ -4,7 +4,7 @@ enum Op {
     ADR = 0,
 
     /// Form a PC-relative address to a 4KB page.
-    ADRP = 1
+    ADRP = 1,
 }
 
 /// The struct that represents an A64 PC-relative address instruction that can
@@ -25,20 +25,28 @@ pub struct PCRelative {
     imm: i32,
 
     /// Which operation to perform for this instruction.
-    op: Op
+    op: Op,
 }
 
 impl PCRelative {
     /// ADR
     /// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/ADR--Form-PC-relative-address-
     pub fn adr(rd: u8, imm: i32) -> Self {
-        Self { rd, imm, op: Op::ADR }
+        Self {
+            rd,
+            imm,
+            op: Op::ADR,
+        }
     }
 
     /// ADRP
     /// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/ADRP--Form-PC-relative-address-to-4KB-page-
     pub fn adrp(rd: u8, imm: i32) -> Self {
-        Self { rd, imm: imm >> 12, op: Op::ADRP }
+        Self {
+            rd,
+            imm: imm >> 12,
+            op: Op::ADRP,
+        }
     }
 }
 
@@ -56,12 +64,7 @@ impl From<PCRelative> for u32 {
             immhi |= 1 << 18;
         }
 
-        0
-        | ((inst.op as u32) << 31)
-        | (immlo << 29)
-        | (FAMILY << 25)
-        | (immhi << 5)
-        | inst.rd as u32
+        ((inst.op as u32) << 31) | (immlo << 29) | (FAMILY << 25) | (immhi << 5) | inst.rd as u32
     }
 }
 

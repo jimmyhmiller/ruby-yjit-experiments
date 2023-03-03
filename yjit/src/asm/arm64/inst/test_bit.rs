@@ -7,7 +7,7 @@ enum B5 {
     B532 = 0,
 
     /// When the bit number is equal to or above 32.
-    B564 = 1
+    B564 = 1,
 }
 
 /// A convenience function so that we can convert the bit number directly into a
@@ -17,7 +17,7 @@ impl From<u8> for B5 {
         match bit_num {
             0..=31 => B5::B532,
             32..=63 => B5::B564,
-            _ => panic!("Invalid bit number: {}", bit_num)
+            _ => panic!("Invalid bit number: {}", bit_num),
         }
     }
 }
@@ -28,7 +28,7 @@ enum Op {
     TBZ = 0,
 
     /// The test bit not zero operation.
-    TBNZ = 1
+    TBNZ = 1,
 }
 
 /// The struct that represents an A64 test bit instruction that can be encoded.
@@ -55,20 +55,32 @@ pub struct TestBit {
     op: Op,
 
     /// The upper bit of the bit number to test.
-    b5: B5
+    b5: B5,
 }
 
 impl TestBit {
     /// TBNZ
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/TBNZ--Test-bit-and-Branch-if-Nonzero-?lang=en
     pub fn tbnz(rt: u8, bit_num: u8, offset: i16) -> Self {
-        Self { rt, imm14: offset, b40: bit_num & 0b11111, op: Op::TBNZ, b5: bit_num.into() }
+        Self {
+            rt,
+            imm14: offset,
+            b40: bit_num & 0b11111,
+            op: Op::TBNZ,
+            b5: bit_num.into(),
+        }
     }
 
     /// TBZ
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/TBZ--Test-bit-and-Branch-if-Zero-?lang=en
     pub fn tbz(rt: u8, bit_num: u8, offset: i16) -> Self {
-        Self { rt, imm14: offset, b40: bit_num & 0b11111, op: Op::TBZ, b5: bit_num.into() }
+        Self {
+            rt,
+            imm14: offset,
+            b40: bit_num & 0b11111,
+            op: Op::TBZ,
+            b5: bit_num.into(),
+        }
     }
 }
 
@@ -81,13 +93,12 @@ impl From<TestBit> for u32 {
         let b40 = (inst.b40 & 0b11111) as u32;
         let imm14 = truncate_imm::<_, 14>(inst.imm14);
 
-        0
-        | ((inst.b5 as u32) << 31)
-        | (FAMILY << 25)
-        | ((inst.op as u32) << 24)
-        | (b40 << 19)
-        | (imm14 << 5)
-        | inst.rt as u32
+        ((inst.b5 as u32) << 31)
+            | (FAMILY << 25)
+            | ((inst.op as u32) << 24)
+            | (b40 << 19)
+            | (imm14 << 5)
+            | inst.rt as u32
     }
 }
 

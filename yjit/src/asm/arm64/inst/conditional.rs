@@ -23,14 +23,20 @@ pub struct Conditional {
     rm: u8,
 
     /// The size of the registers of this instruction.
-    sf: Sf
+    sf: Sf,
 }
 
 impl Conditional {
     /// CSEL
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/CSEL--Conditional-Select-?lang=en
     pub fn csel(rd: u8, rn: u8, rm: u8, cond: u8, num_bits: u8) -> Self {
-        Self { rd, rn, cond, rm, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            cond,
+            rm,
+            sf: num_bits.into(),
+        }
     }
 }
 
@@ -40,15 +46,14 @@ const FAMILY: u32 = 0b101;
 impl From<Conditional> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: Conditional) -> Self {
-        0
-        | ((inst.sf as u32) << 31)
-        | (1 << 28)
-        | (FAMILY << 25)
-        | (1 << 23)
-        | ((inst.rm as u32) << 16)
-        | ((inst.cond as u32) << 12)
-        | ((inst.rn as u32) << 5)
-        | (inst.rd as u32)
+        ((inst.sf as u32) << 31)
+            | (1 << 28)
+            | (FAMILY << 25)
+            | (1 << 23)
+            | ((inst.rm as u32) << 16)
+            | ((inst.cond as u32) << 12)
+            | ((inst.rn as u32) << 5)
+            | (inst.rd as u32)
     }
 }
 
@@ -62,8 +67,8 @@ impl From<Conditional> for [u8; 4] {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::super::arg::Condition;
+    use super::*;
 
     #[test]
     fn test_csel() {

@@ -1,6 +1,15 @@
-use std::{ffi::c_uint, ops::{BitOr, BitAnd, BitOrAssign}};
+use std::{
+    ffi::c_uint,
+    ops::{BitAnd, BitOr, BitOrAssign},
+};
 
-use crate::{cruby::{rb_callinfo, vm_ci_flag, VM_CALL_KW_SPLAT, VM_CALL_ARGS_BLOCKARG, VM_CALL_KWARG, VM_CALL_ARGS_SPLAT, VM_CALL_FCALL, VM_CALL_OPT_SEND, VM_CALL_ZSUPER}, backend::ir::Opnd};
+use crate::{
+    backend::ir::Opnd,
+    cruby::{
+        rb_callinfo, vm_ci_flag, VM_CALL_ARGS_BLOCKARG, VM_CALL_ARGS_SPLAT, VM_CALL_FCALL,
+        VM_CALL_KWARG, VM_CALL_KW_SPLAT, VM_CALL_OPT_SEND, VM_CALL_ZSUPER,
+    },
+};
 
 pub struct CallFlags(c_uint);
 
@@ -12,7 +21,6 @@ impl CallFlags {
     pub fn is_kw_splat(&self) -> bool {
         self.0 & VM_CALL_KW_SPLAT != 0
     }
-
 
     pub fn is_block_arg(&self) -> bool {
         self.0 & VM_CALL_ARGS_BLOCKARG != 0
@@ -74,14 +82,14 @@ impl BitOrAssign for CallFlags {
     }
 }
 
-impl Into<u32> for CallFlags {
-    fn into(self) -> u32 {
-        self.0
+impl From<CallFlags> for u32 {
+    fn from(val: CallFlags) -> Self {
+        val.0
     }
 }
 
-impl Into<Opnd> for CallFlags {
-    fn into(self) -> Opnd {
-        Opnd::UImm(self.0 as u64)
+impl From<CallFlags> for Opnd {
+    fn from(val: CallFlags) -> Self {
+        Opnd::UImm(val.0 as u64)
     }
 }

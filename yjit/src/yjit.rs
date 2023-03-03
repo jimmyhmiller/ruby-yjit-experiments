@@ -3,8 +3,8 @@ use crate::core::*;
 use crate::cruby::*;
 use crate::invariants::*;
 use crate::options::*;
-use crate::stats::YjitExitLocations;
 use crate::stats::incr_counter;
+use crate::stats::YjitExitLocations;
 
 use std::os::raw;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,7 +19,7 @@ static YJIT_ENABLED: AtomicBool = AtomicBool::new(false);
 /// This is called from ruby.c
 #[no_mangle]
 pub extern "C" fn rb_yjit_parse_option(str_ptr: *const raw::c_char) -> bool {
-    return parse_option(str_ptr).is_some();
+    parse_option(str_ptr).is_some()
 }
 
 /// Is YJIT on? The interpreter uses this function to decide whether to increment
@@ -77,8 +77,8 @@ pub extern "C" fn rb_yjit_init_rust() {
 /// In case we want to start doing fancier exception handling with panic=unwind,
 /// we can revisit this later. For now, this helps to get us good bug reports.
 fn rb_bug_panic_hook() {
-    use std::panic;
     use std::io::{stderr, Write};
+    use std::panic;
 
     // Probably the default hook. We do this very early during process boot.
     let previous_hook = panic::take_hook();
@@ -89,7 +89,9 @@ fn rb_bug_panic_hook() {
 
         previous_hook(panic_info);
 
-        unsafe { rb_bug(b"YJIT panicked\0".as_ref().as_ptr() as *const raw::c_char); }
+        unsafe {
+            rb_bug(b"YJIT panicked\0".as_ref().as_ptr() as *const raw::c_char);
+        }
     }));
 }
 
@@ -150,5 +152,5 @@ pub extern "C" fn rb_yjit_simulate_oom_bang(_ec: EcPtr, _ruby_self: VALUE) -> VA
         ocb.set_pos(ocb.get_mem_size());
     }
 
-    return Qnil;
+    Qnil
 }

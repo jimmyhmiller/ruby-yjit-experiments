@@ -1,4 +1,4 @@
-use super::super::arg::{InstructionOffset, truncate_imm};
+use super::super::arg::{truncate_imm, InstructionOffset};
 
 /// The size of the operands being operated on.
 enum Opc {
@@ -13,7 +13,7 @@ impl From<u8> for Opc {
         match num_bits {
             64 => Opc::Size64,
             32 => Opc::Size32,
-            _ => panic!("Invalid number of bits: {}", num_bits)
+            _ => panic!("Invalid number of bits: {}", num_bits),
         }
     }
 }
@@ -35,14 +35,18 @@ pub struct LoadLiteral {
     offset: InstructionOffset,
 
     /// The size of the operands being operated on.
-    opc: Opc
+    opc: Opc,
 }
 
 impl LoadLiteral {
     /// LDR (load literal)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--literal---Load-Register--literal--?lang=en
     pub fn ldr_literal(rt: u8, offset: InstructionOffset, num_bits: u8) -> Self {
-        Self { rt, offset, opc: num_bits.into() }
+        Self {
+            rt,
+            offset,
+            opc: num_bits.into(),
+        }
     }
 }
 
@@ -52,12 +56,11 @@ const FAMILY: u32 = 0b0100;
 impl From<LoadLiteral> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: LoadLiteral) -> Self {
-        0
-        | ((inst.opc as u32) << 30)
-        | (1 << 28)
-        | (FAMILY << 25)
-        | (truncate_imm::<_, 19>(inst.offset) << 5)
-        | (inst.rt as u32)
+        ((inst.opc as u32) << 30)
+            | (1 << 28)
+            | (FAMILY << 25)
+            | (truncate_imm::<_, 19>(inst.offset) << 5)
+            | (inst.rt as u32)
     }
 }
 

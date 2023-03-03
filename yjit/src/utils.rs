@@ -96,13 +96,13 @@ pub fn iseq_get_location(iseq: IseqPtr, pos: u32) -> String {
     } else {
         ruby_str_to_rust(iseq_label)
     };
-    s.push_str("@");
+    s.push('@');
     if iseq_path == Qnil {
         s.push_str("None");
     } else {
         s.push_str(&ruby_str_to_rust(iseq_path));
     }
-    s.push_str(":");
+    s.push(':');
     s.push_str(&iseq_lineno.to_string());
     s
 }
@@ -142,7 +142,7 @@ macro_rules! c_callable {
 pub(crate) use c_callable;
 
 pub fn print_int(asm: &mut Assembler, opnd: Opnd) {
-    c_callable!{
+    c_callable! {
         fn print_int_fn(val: i64) {
             println!("{}", val);
         }
@@ -158,7 +158,7 @@ pub fn print_int(asm: &mut Assembler, opnd: Opnd) {
             } else {
                 opnd
             }
-        },
+        }
         Opnd::Imm(_) | Opnd::UImm(_) => opnd,
         _ => unreachable!(),
     };
@@ -169,7 +169,7 @@ pub fn print_int(asm: &mut Assembler, opnd: Opnd) {
 
 /// Generate code to print a pointer
 pub fn print_ptr(asm: &mut Assembler, opnd: Opnd) {
-    c_callable!{
+    c_callable! {
         fn print_ptr_fn(ptr: *const u8) {
             println!("{:p}", ptr);
         }
@@ -184,7 +184,7 @@ pub fn print_ptr(asm: &mut Assembler, opnd: Opnd) {
 
 /// Generate code to print a value
 pub fn print_value(asm: &mut Assembler, opnd: Opnd) {
-    c_callable!{
+    c_callable! {
         fn print_value_fn(val: VALUE) {
             unsafe { rb_obj_info_dump(val) }
         }
@@ -199,7 +199,7 @@ pub fn print_value(asm: &mut Assembler, opnd: Opnd) {
 
 /// Generate code to print constant string to stdout
 pub fn print_str(asm: &mut Assembler, str: &str) {
-    c_callable!{
+    c_callable! {
         fn print_str_cfun(ptr: *const u8, num_bytes: usize) {
             unsafe {
                 let slice = slice::from_raw_parts(ptr, num_bytes);
@@ -220,7 +220,10 @@ pub fn print_str(asm: &mut Assembler, str: &str) {
     asm.write_label(after_string);
 
     let opnd = asm.lea_label(string_data);
-    asm.ccall(print_str_cfun as *const u8, vec![opnd, Opnd::UImm(str.len() as u64)]);
+    asm.ccall(
+        print_str_cfun as *const u8,
+        vec![opnd, Opnd::UImm(str.len() as u64)],
+    );
 
     asm.cpop_all();
 }
@@ -253,7 +256,11 @@ mod tests {
             b: u64,
         }
 
-        assert_eq!(0, offset_of!(Foo, a), "C99 6.7.2.1p13 says no padding at the front");
+        assert_eq!(
+            0,
+            offset_of!(Foo, a),
+            "C99 6.7.2.1p13 says no padding at the front"
+        );
         assert_eq!(8, offset_of!(Foo, b), "ABI dependent, but should hold");
     }
 

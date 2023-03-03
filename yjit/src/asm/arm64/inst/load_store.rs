@@ -15,7 +15,7 @@ impl From<u8> for Size {
         match num_bits {
             64 => Size::Size64,
             32 => Size::Size32,
-            _ => panic!("Invalid number of bits: {}", num_bits)
+            _ => panic!("Invalid number of bits: {}", num_bits),
         }
     }
 }
@@ -24,14 +24,14 @@ impl From<u8> for Size {
 enum Opc {
     STR = 0b00,
     LDR = 0b01,
-    LDURSW = 0b10
+    LDURSW = 0b10,
 }
 
 /// What kind of indexing to perform for this instruction.
 enum Index {
     None = 0b00,
     PostIndex = 0b01,
-    PreIndex = 0b11
+    PreIndex = 0b11,
 }
 
 /// The struct that represents an A64 load or store instruction that can be
@@ -61,68 +61,138 @@ pub struct LoadStore {
     opc: Opc,
 
     /// The size of the operands being operated on.
-    size: Size
+    size: Size,
 }
 
 impl LoadStore {
     /// LDR (immediate, post-index)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--immediate---Load-Register--immediate--
     pub fn ldr_post(rt: u8, rn: u8, imm9: i16, num_bits: u8) -> Self {
-        Self { rt, rn, idx: Index::PostIndex, imm9, opc: Opc::LDR, size: num_bits.into() }
+        Self {
+            rt,
+            rn,
+            idx: Index::PostIndex,
+            imm9,
+            opc: Opc::LDR,
+            size: num_bits.into(),
+        }
     }
 
     /// LDR (immediate, pre-index)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--immediate---Load-Register--immediate--
     pub fn ldr_pre(rt: u8, rn: u8, imm9: i16, num_bits: u8) -> Self {
-        Self { rt, rn, idx: Index::PreIndex, imm9, opc: Opc::LDR, size: num_bits.into() }
+        Self {
+            rt,
+            rn,
+            idx: Index::PreIndex,
+            imm9,
+            opc: Opc::LDR,
+            size: num_bits.into(),
+        }
     }
 
     /// LDUR (load register, unscaled)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDUR--Load-Register--unscaled--?lang=en
     pub fn ldur(rt: u8, rn: u8, imm9: i16, num_bits: u8) -> Self {
-        Self { rt, rn, idx: Index::None, imm9, opc: Opc::LDR, size: num_bits.into() }
+        Self {
+            rt,
+            rn,
+            idx: Index::None,
+            imm9,
+            opc: Opc::LDR,
+            size: num_bits.into(),
+        }
     }
 
     /// LDURH Load Register Halfword (unscaled)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDURH--Load-Register-Halfword--unscaled--?lang=en
     pub fn ldurh(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, idx: Index::None, imm9, opc: Opc::LDR, size: Size::Size16 }
+        Self {
+            rt,
+            rn,
+            idx: Index::None,
+            imm9,
+            opc: Opc::LDR,
+            size: Size::Size16,
+        }
     }
 
     /// LDURB (load register, byte, unscaled)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDURB--Load-Register-Byte--unscaled--?lang=en
     pub fn ldurb(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, idx: Index::None, imm9, opc: Opc::LDR, size: Size::Size8 }
+        Self {
+            rt,
+            rn,
+            idx: Index::None,
+            imm9,
+            opc: Opc::LDR,
+            size: Size::Size8,
+        }
     }
 
     /// LDURSW (load register, unscaled, signed)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDURSW--Load-Register-Signed-Word--unscaled--?lang=en
     pub fn ldursw(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, idx: Index::None, imm9, opc: Opc::LDURSW, size: Size::Size32 }
+        Self {
+            rt,
+            rn,
+            idx: Index::None,
+            imm9,
+            opc: Opc::LDURSW,
+            size: Size::Size32,
+        }
     }
 
     /// STR (immediate, post-index)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/STR--immediate---Store-Register--immediate--
     pub fn str_post(rt: u8, rn: u8, imm9: i16, num_bits: u8) -> Self {
-        Self { rt, rn, idx: Index::PostIndex, imm9, opc: Opc::STR, size: num_bits.into() }
+        Self {
+            rt,
+            rn,
+            idx: Index::PostIndex,
+            imm9,
+            opc: Opc::STR,
+            size: num_bits.into(),
+        }
     }
 
     /// STR (immediate, pre-index)
     /// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/STR--immediate---Store-Register--immediate--
     pub fn str_pre(rt: u8, rn: u8, imm9: i16, num_bits: u8) -> Self {
-        Self { rt, rn, idx: Index::PreIndex, imm9, opc: Opc::STR, size: num_bits.into() }
+        Self {
+            rt,
+            rn,
+            idx: Index::PreIndex,
+            imm9,
+            opc: Opc::STR,
+            size: num_bits.into(),
+        }
     }
 
     /// STUR (store register, unscaled)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STUR--Store-Register--unscaled--?lang=en
     pub fn stur(rt: u8, rn: u8, imm9: i16, num_bits: u8) -> Self {
-        Self { rt, rn, idx: Index::None, imm9, opc: Opc::STR, size: num_bits.into() }
+        Self {
+            rt,
+            rn,
+            idx: Index::None,
+            imm9,
+            opc: Opc::STR,
+            size: num_bits.into(),
+        }
     }
 
     /// STURH (store register, halfword, unscaled)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STURH--Store-Register-Halfword--unscaled--?lang=en
     pub fn sturh(rt: u8, rn: u8, imm9: i16) -> Self {
-        Self { rt, rn, idx: Index::None, imm9, opc: Opc::STR, size: Size::Size16 }
+        Self {
+            rt,
+            rn,
+            idx: Index::None,
+            imm9,
+            opc: Opc::STR,
+            size: Size::Size16,
+        }
     }
 }
 
@@ -132,15 +202,14 @@ const FAMILY: u32 = 0b0100;
 impl From<LoadStore> for u32 {
     /// Convert an instruction into a 32-bit value.
     fn from(inst: LoadStore) -> Self {
-        0
-        | ((inst.size as u32) << 30)
-        | (0b11 << 28)
-        | (FAMILY << 25)
-        | ((inst.opc as u32) << 22)
-        | (truncate_imm::<_, 9>(inst.imm9) << 12)
-        | ((inst.idx as u32) << 10)
-        | ((inst.rn as u32) << 5)
-        | (inst.rt as u32)
+        ((inst.size as u32) << 30)
+            | (0b11 << 28)
+            | (FAMILY << 25)
+            | ((inst.opc as u32) << 22)
+            | (truncate_imm::<_, 9>(inst.imm9) << 12)
+            | ((inst.idx as u32) << 10)
+            | ((inst.rn as u32) << 5)
+            | (inst.rt as u32)
     }
 }
 

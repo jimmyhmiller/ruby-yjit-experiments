@@ -3,13 +3,13 @@ use super::super::arg::{Sf, ShiftedImmediate};
 /// The operation being performed by this instruction.
 enum Op {
     Add = 0b0,
-    Sub = 0b1
+    Sub = 0b1,
 }
 
 // Whether or not to update the flags when this instruction is performed.
 enum S {
     LeaveFlags = 0b0,
-    UpdateFlags = 0b1
+    UpdateFlags = 0b1,
 }
 
 /// The struct that represents an A64 data processing -- immediate instruction
@@ -39,20 +39,34 @@ pub struct DataImm {
     op: Op,
 
     /// Whether or not this instruction is operating on 64-bit operands.
-    sf: Sf
+    sf: Sf,
 }
 
 impl DataImm {
     /// ADD (immediate)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADD--immediate---Add--immediate--?lang=en
     pub fn add(rd: u8, rn: u8, imm: ShiftedImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, s: S::LeaveFlags, op: Op::Add, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            s: S::LeaveFlags,
+            op: Op::Add,
+            sf: num_bits.into(),
+        }
     }
 
     /// ADDS (immediate, set flags)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADDS--immediate---Add--immediate---setting-flags-?lang=en
     pub fn adds(rd: u8, rn: u8, imm: ShiftedImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, s: S::UpdateFlags, op: Op::Add, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            s: S::UpdateFlags,
+            op: Op::Add,
+            sf: num_bits.into(),
+        }
     }
 
     /// CMP (immediate)
@@ -64,13 +78,27 @@ impl DataImm {
     /// SUB (immediate)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/SUB--immediate---Subtract--immediate--?lang=en
     pub fn sub(rd: u8, rn: u8, imm: ShiftedImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, s: S::LeaveFlags, op: Op::Sub, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            s: S::LeaveFlags,
+            op: Op::Sub,
+            sf: num_bits.into(),
+        }
     }
 
     /// SUBS (immediate, set flags)
     /// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/SUBS--immediate---Subtract--immediate---setting-flags-?lang=en
     pub fn subs(rd: u8, rn: u8, imm: ShiftedImmediate, num_bits: u8) -> Self {
-        Self { rd, rn, imm, s: S::UpdateFlags, op: Op::Sub, sf: num_bits.into() }
+        Self {
+            rd,
+            rn,
+            imm,
+            s: S::UpdateFlags,
+            op: Op::Sub,
+            sf: num_bits.into(),
+        }
     }
 }
 
@@ -82,15 +110,14 @@ impl From<DataImm> for u32 {
     fn from(inst: DataImm) -> Self {
         let imm: u32 = inst.imm.into();
 
-        0
-        | ((inst.sf as u32) << 31)
-        | ((inst.op as u32) << 30)
-        | ((inst.s as u32) << 29)
-        | (FAMILY << 25)
-        | (1 << 24)
-        | (imm << 10)
-        | ((inst.rn as u32) << 5)
-        | inst.rd as u32
+        ((inst.sf as u32) << 31)
+            | ((inst.op as u32) << 30)
+            | ((inst.s as u32) << 29)
+            | (FAMILY << 25)
+            | (1 << 24)
+            | (imm << 10)
+            | ((inst.rn as u32) << 5)
+            | inst.rd as u32
     }
 }
 
