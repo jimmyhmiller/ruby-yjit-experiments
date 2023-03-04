@@ -349,7 +349,7 @@ pub struct Context {
     sp_offset: i8,
 
     // Depth of this block in the sidechain (eg: inline-cache chain)
-    chain_depth: u8,
+    pub chain_depth: u8,
 
     // Local variable types we keep track of
     local_types: [Type; MAX_LOCAL_TYPES],
@@ -546,7 +546,7 @@ pub struct Branch {
     targets: [Option<Box<BranchTarget>>; 2],
 
     // Branch code generation function
-    gen_fn: BranchGenFn,
+    pub gen_fn: BranchGenFn,
 }
 
 impl Branch {
@@ -556,7 +556,7 @@ impl Branch {
     }
 
     /// Get the address of one of the branch destination
-    fn get_target_address(&self, target_idx: usize) -> Option<CodePtr> {
+    pub fn get_target_address(&self, target_idx: usize) -> Option<CodePtr> {
         self.targets[target_idx]
             .as_ref()
             .and_then(|target| target.get_address())
@@ -582,7 +582,7 @@ pub type CmePtr = *const rb_callable_method_entry_t;
 #[derive(Clone, Debug)]
 pub struct Block {
     // Bytecode sequence (iseq, idx) this is a version of
-    blockid: BlockId,
+    pub blockid: BlockId,
 
     // Index one past the last instruction for this block in the iseq
     end_idx: u32,
@@ -1861,7 +1861,7 @@ fn regenerate_branch(cb: &mut CodeBlock, branch: &mut Branch) {
 }
 
 /// Create a new outgoing branch entry for a block
-fn make_branch_entry(jit: &mut JITState, block: &BlockRef, gen_fn: BranchGenFn) -> BranchRef {
+pub fn make_branch_entry(jit: &mut JITState, block: &BlockRef, gen_fn: BranchGenFn) -> BranchRef {
     let branch = Branch {
         // Block this is attached to
         block: block.clone(),
@@ -2072,7 +2072,7 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
 }
 
 /// Set up a branch target at an index with a block version or a stub
-fn set_branch_target(
+pub fn set_branch_target(
     target_idx: u32,
     target: BlockId,
     ctx: &Context,
@@ -2162,7 +2162,7 @@ pub fn gen_branch_stub_hit_trampoline(ocb: &mut OutlinedCb) -> CodePtr {
 
 impl Assembler {
     // Mark the start position of a patchable branch in the machine code
-    fn mark_branch_start(&mut self, branchref: &BranchRef) {
+    pub fn mark_branch_start(&mut self, branchref: &BranchRef) {
         // We need to create our own branch rc object
         // so that we can move the closure below
         let branchref = branchref.clone();
@@ -2174,7 +2174,7 @@ impl Assembler {
     }
 
     // Mark the end position of a patchable branch in the machine code
-    fn mark_branch_end(&mut self, branchref: &BranchRef) {
+    pub fn mark_branch_end(&mut self, branchref: &BranchRef) {
         // We need to create our own branch rc object
         // so that we can move the closure below
         let branchref = branchref.clone();
@@ -2187,33 +2187,32 @@ impl Assembler {
 }
 
 pub fn gen_branch(
-    jit: &mut JITState,
-    asm: &mut Assembler,
-    ocb: &mut OutlinedCb,
+    code_generator: &mut CodeGenerator,
     target0: BlockId,
     ctx0: &Context,
     target1: Option<BlockId>,
     ctx1: Option<&Context>,
     gen_fn: BranchGenFn,
 ) {
-    let branchref = make_branch_entry(jit, &jit.get_block(), gen_fn);
+    let block_ref = code_generator.jit.get_block();
+    let branchref = make_branch_entry(&mut code_generator.jit, &block_ref, gen_fn);
     let branch = &mut branchref.borrow_mut();
 
     // Get the branch targets or stubs
-    set_branch_target(0, target0, ctx0, &branchref, branch, ocb);
+    set_branch_target(0, target0, ctx0, &branchref, branch, code_generator.get_ocb());
     if let Some(ctx) = ctx1 {
-        set_branch_target(1, target1.unwrap(), ctx, &branchref, branch, ocb);
+        set_branch_target(1, target1.unwrap(), ctx, &branchref, branch, code_generator.get_ocb());
         if branch.targets[1].is_none() {
             return; // avoid unwrap() in gen_fn()
         }
     }
 
     // Call the branch generation function
-    asm.mark_branch_start(&branchref);
+    code_generator.asm.mark_branch_start(&branchref);
     if let Some(dst_addr) = branch.get_target_address(0) {
-        gen_fn.call(asm, dst_addr, branch.get_target_address(1));
+        gen_fn.call(&mut code_generator.asm, dst_addr, branch.get_target_address(1));
     }
-    asm.mark_branch_end(&branchref);
+    code_generator.asm.mark_branch_end(&branchref);
 }
 
 pub fn gen_direct_jump(jit: &mut JITState, ctx: &Context, target0: BlockId, asm: &mut Assembler) {
@@ -2262,54 +2261,6 @@ pub fn gen_direct_jump(jit: &mut JITState, ctx: &Context, target0: BlockId, asm:
     branch.targets[0] = Some(Box::new(new_target));
 }
 
-/// Create a stub to force the code up to this point to be executed
-pub fn defer_compilation(
-    jit: &mut JITState,
-    cur_ctx: &Context,
-    asm: &mut Assembler,
-    ocb: &mut OutlinedCb,
-) {
-    if cur_ctx.chain_depth != 0 {
-        panic!("Double defer!");
-    }
-
-    let mut next_ctx = cur_ctx.clone();
-
-    if next_ctx.chain_depth == u8::MAX {
-        panic!("max block version chain depth reached!");
-    }
-    next_ctx.chain_depth += 1;
-
-    let block_rc = jit.get_block();
-    let branch_rc = make_branch_entry(
-        jit,
-        &jit.get_block(),
-        BranchGenFn::JumpToTarget0(BranchShape::Default),
-    );
-    let mut branch = branch_rc.borrow_mut();
-    let block = block_rc.borrow();
-
-    let blockid = BlockId {
-        iseq: block.blockid.iseq,
-        idx: jit.get_insn_idx(),
-    };
-    set_branch_target(0, blockid, &next_ctx, &branch_rc, &mut branch, ocb);
-
-    // Call the branch generation function
-    asm.comment("defer_compilation");
-    asm.mark_branch_start(&branch_rc);
-    if let Some(dst_addr) = branch.get_target_address(0) {
-        branch.gen_fn.call(asm, dst_addr, None);
-    }
-    asm.mark_branch_end(&branch_rc);
-
-    // If the block we're deferring from is empty
-    if jit.get_block().borrow().get_blockid().idx == jit.get_insn_idx() {
-        incr_counter!(defer_empty_count);
-    }
-
-    incr_counter!(defer_count);
-}
 
 fn remove_from_graph(blockref: &BlockRef) {
     let block = blockref.borrow();

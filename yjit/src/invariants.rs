@@ -1,7 +1,6 @@
 //! Code to track assumptions made during code generation and invalidate
 //! generated code if and when these assumptions are invalidated.
 
-use crate::asm::OutlinedCb;
 use crate::codegen::*;
 use crate::core::*;
 use crate::cruby::*;
@@ -23,35 +22,35 @@ use std::mem;
 /// about the state of the virtual machine.
 pub struct Invariants {
     /// Tracks block assumptions about callable method entry validity.
-    cme_validity: HashMap<*const rb_callable_method_entry_t, HashSet<BlockRef>>,
+    pub cme_validity: HashMap<*const rb_callable_method_entry_t, HashSet<BlockRef>>,
 
     /// A map from a class and its associated basic operator to a set of blocks
     /// that are assuming that that operator is not redefined. This is used for
     /// quick access to all of the blocks that are making this assumption when
     /// the operator is redefined.
-    basic_operator_blocks: HashMap<(RedefinitionFlag, ruby_basic_operators), HashSet<BlockRef>>,
+    pub basic_operator_blocks: HashMap<(RedefinitionFlag, ruby_basic_operators), HashSet<BlockRef>>,
 
     /// A map from a block to a set of classes and their associated basic
     /// operators that the block is assuming are not redefined. This is used for
     /// quick access to all of the assumptions that a block is making when it
     /// needs to be invalidated.
-    block_basic_operators: HashMap<BlockRef, HashSet<(RedefinitionFlag, ruby_basic_operators)>>,
+    pub block_basic_operators: HashMap<BlockRef, HashSet<(RedefinitionFlag, ruby_basic_operators)>>,
 
     /// Tracks the set of blocks that are assuming the interpreter is running
     /// with only one ractor. This is important for things like accessing
     /// constants which can have different semantics when multiple ractors are
     /// running.
-    single_ractor: HashSet<BlockRef>,
+    pub single_ractor: HashSet<BlockRef>,
 
     /// A map from an ID to the set of blocks that are assuming a constant with
     /// that ID as part of its name has not been redefined. For example, if
     /// a constant `A::B` is redefined, then all blocks that are assuming that
     /// `A` and `B` have not be redefined must be invalidated.
-    constant_state_blocks: HashMap<ID, HashSet<BlockRef>>,
+    pub constant_state_blocks: HashMap<ID, HashSet<BlockRef>>,
 
     /// A map from a block to a set of IDs that it is assuming have not been
     /// redefined.
-    block_constant_states: HashMap<BlockRef, HashSet<ID>>,
+    pub block_constant_states: HashMap<BlockRef, HashSet<ID>>,
 }
 
 /// Private singleton instance of the invariants global struct.
@@ -78,35 +77,6 @@ impl Invariants {
     }
 }
 
-/// A public function that can be called from within the code generation
-/// functions to ensure that the block being generated is invalidated when the
-/// basic operator is redefined.
-pub fn assume_bop_not_redefined(
-    jit: &mut JITState,
-    ocb: &mut OutlinedCb,
-    klass: RedefinitionFlag,
-    bop: ruby_basic_operators,
-) -> bool {
-    if unsafe { BASIC_OP_UNREDEFINED_P(bop, klass) } {
-        jit_ensure_block_entry_exit(jit, ocb);
-
-        let invariants = Invariants::get_instance();
-        invariants
-            .basic_operator_blocks
-            .entry((klass, bop))
-            .or_default()
-            .insert(jit.get_block());
-        invariants
-            .block_basic_operators
-            .entry(jit.get_block())
-            .or_default()
-            .insert((klass, bop));
-
-        true
-    } else {
-        false
-    }
-}
 
 // Remember that a block assumes that
 // `rb_callable_method_entry(receiver_klass, cme->called_id) == cme` and that
@@ -116,14 +86,13 @@ pub fn assume_bop_not_redefined(
 //
 // @raise NoMemoryError
 pub fn assume_method_lookup_stable(
-    jit: &mut JITState,
-    ocb: &mut OutlinedCb,
+    code_generator: &mut CodeGenerator,
     callee_cme: *const rb_callable_method_entry_t,
 ) {
-    jit_ensure_block_entry_exit(jit, ocb);
+    code_generator.jit_ensure_block_entry_exit();
 
-    let block = jit.get_block();
-    jit.push_cme_dependency(callee_cme);
+    let block = code_generator.jit.get_block();
+    code_generator.jit.push_cme_dependency(callee_cme);
 
     Invariants::get_instance()
         .cme_validity
@@ -137,14 +106,13 @@ pub fn assume_method_lookup_stable(
 // A "basic method" is one defined during VM boot, so we can use this to check assumptions based on
 // default behavior.
 pub fn assume_method_basic_definition(
-    jit: &mut JITState,
-    ocb: &mut OutlinedCb,
+    code_generator: &mut CodeGenerator,
     klass: VALUE,
     mid: ID,
 ) -> bool {
     if unsafe { rb_method_basic_definition_p(klass, mid) } != 0 {
         let cme = unsafe { rb_callable_method_entry(klass, mid) };
-        assume_method_lookup_stable(jit, ocb, cme);
+        assume_method_lookup_stable(code_generator, cme);
         true
     } else {
         false
@@ -153,14 +121,14 @@ pub fn assume_method_basic_definition(
 
 /// Tracks that a block is assuming it is operating in single-ractor mode.
 #[must_use]
-pub fn assume_single_ractor_mode(jit: &mut JITState, ocb: &mut OutlinedCb) -> bool {
+pub fn assume_single_ractor_mode(code_generator: &mut CodeGenerator) -> bool {
     if unsafe { rb_yjit_multi_ractor_p() } {
         false
     } else {
-        jit_ensure_block_entry_exit(jit, ocb);
+        code_generator.jit_ensure_block_entry_exit();
         Invariants::get_instance()
             .single_ractor
-            .insert(jit.get_block());
+            .insert(code_generator.jit.get_block());
         true
     }
 }
@@ -169,7 +137,7 @@ pub fn assume_single_ractor_mode(jit: &mut JITState, ocb: &mut OutlinedCb) -> bo
 /// subsequent opt_setinlinecache and find all of the name components that are
 /// associated with this constant (which correspond to the getconstant
 /// arguments).
-pub fn assume_stable_constant_names(jit: &mut JITState, ocb: &mut OutlinedCb, idlist: *const ID) {
+pub fn assume_stable_constant_names(code_generator: &mut CodeGenerator, idlist: *const ID) {
     /// Tracks that a block is assuming that the name component of a constant
     /// has not changed since the last call to this function.
     fn assume_stable_constant_name(jit: &mut JITState, id: ID) {
@@ -194,11 +162,11 @@ pub fn assume_stable_constant_names(jit: &mut JITState, ocb: &mut OutlinedCb, id
     for i in 0.. {
         match unsafe { *idlist.offset(i) } {
             0 => break, // End of NULL terminated list
-            id => assume_stable_constant_name(jit, id),
+            id => assume_stable_constant_name(&mut code_generator.jit, id),
         }
     }
 
-    jit_ensure_block_entry_exit(jit, ocb);
+    code_generator.jit_ensure_block_entry_exit();
 }
 
 /// Called when a basic operator is redefined. Note that all the blocks assuming
