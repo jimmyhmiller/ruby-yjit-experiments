@@ -55,7 +55,6 @@ pub fn disasm_iseq_insn_range(iseq: IseqPtr, start_idx: u32, end_idx: u32) -> St
 
     // Sort the blocks by increasing start addresses
     block_list.sort_by(|a, b| {
-
         // Get the start addresses for each block
         let addr_a = a.borrow().get_start_addr().raw_ptr();
         let addr_b = b.borrow().get_start_addr().raw_ptr();

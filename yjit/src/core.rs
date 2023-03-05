@@ -5,6 +5,7 @@ use crate::cruby::*;
 #[cfg(feature = "disasm")]
 use crate::disasm::*;
 use crate::invariants::block_assumptions_free;
+use crate::jit_state::JITState;
 use crate::options::*;
 use crate::stats::*;
 use crate::utils::*;
@@ -104,7 +105,16 @@ impl Type {
 
     /// Check if the type is an immediate
     pub fn is_imm(&self) -> bool {
-        matches!(self, Type::UnknownImm | Type::Nil | Type::True | Type::False | Type::Fixnum | Type::Flonum | Type::ImmSymbol)
+        matches!(
+            self,
+            Type::UnknownImm
+                | Type::Nil
+                | Type::True
+                | Type::False
+                | Type::Fixnum
+                | Type::Flonum
+                | Type::ImmSymbol
+        )
     }
 
     /// Returns true when the type is not specific.
@@ -2199,9 +2209,23 @@ pub fn gen_branch(
     let branch = &mut branchref.borrow_mut();
 
     // Get the branch targets or stubs
-    set_branch_target(0, target0, ctx0, &branchref, branch, code_generator.get_ocb());
+    set_branch_target(
+        0,
+        target0,
+        ctx0,
+        &branchref,
+        branch,
+        code_generator.get_ocb(),
+    );
     if let Some(ctx) = ctx1 {
-        set_branch_target(1, target1.unwrap(), ctx, &branchref, branch, code_generator.get_ocb());
+        set_branch_target(
+            1,
+            target1.unwrap(),
+            ctx,
+            &branchref,
+            branch,
+            code_generator.get_ocb(),
+        );
         if branch.targets[1].is_none() {
             return; // avoid unwrap() in gen_fn()
         }
@@ -2210,7 +2234,11 @@ pub fn gen_branch(
     // Call the branch generation function
     code_generator.asm.mark_branch_start(&branchref);
     if let Some(dst_addr) = branch.get_target_address(0) {
-        gen_fn.call(&mut code_generator.asm, dst_addr, branch.get_target_address(1));
+        gen_fn.call(
+            &mut code_generator.asm,
+            dst_addr,
+            branch.get_target_address(1),
+        );
     }
     code_generator.asm.mark_branch_end(&branchref);
 }
@@ -2260,7 +2288,6 @@ pub fn gen_direct_jump(jit: &mut JITState, ctx: &Context, target0: BlockId, asm:
 
     branch.targets[0] = Some(Box::new(new_target));
 }
-
 
 fn remove_from_graph(blockref: &BlockRef) {
     let block = blockref.borrow();

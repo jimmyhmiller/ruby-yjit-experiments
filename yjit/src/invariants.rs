@@ -4,6 +4,7 @@
 use crate::codegen::*;
 use crate::core::*;
 use crate::cruby::*;
+use crate::jit_state::JITState;
 use crate::options::*;
 use crate::stats::*;
 use crate::utils::IntoUsize;
@@ -76,7 +77,6 @@ impl Invariants {
         unsafe { INVARIANTS.as_mut().unwrap() }
     }
 }
-
 
 // Remember that a block assumes that
 // `rb_callable_method_entry(receiver_klass, cme->called_id) == cme` and that

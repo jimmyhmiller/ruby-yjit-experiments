@@ -734,3 +734,46 @@ fn global_allocation_size() -> usize {
         .bytes_allocated
         .saturating_sub(stats.bytes_deallocated)
 }
+
+#[macro_export]
+macro_rules! gen_counter_incr {
+    ($asm:expr, $counter_name:ident) => {
+        if (get_option!(gen_stats)) {
+            // Get a pointer to the counter variable
+            let ptr = ptr_to_counter!($counter_name);
+
+            // Load the pointer into a register
+            $asm.comment(&format!("increment counter {}", stringify!($counter_name)));
+            let ptr_reg = $asm.load(Opnd::const_ptr(ptr as *const u8));
+            let counter_opnd = Opnd::mem(64, ptr_reg, 0);
+
+            // Increment and store the updated value
+            $asm.incr_counter(counter_opnd, Opnd::UImm(1));
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! counted_exit {
+    ($ocb:expr, $existing_side_exit:tt, $counter_name:ident) => {
+        // The counter is only incremented when stats are enabled
+        if (!get_option!(gen_stats)) {
+            $existing_side_exit
+        } else {
+            let ocb = $ocb.unwrap();
+            let code_ptr = ocb.get_write_ptr();
+
+            let mut ocb_asm = Assembler::new();
+
+            // Increment the counter
+            gen_counter_incr!(ocb_asm, $counter_name);
+
+            // Jump to the existing side exit
+            ocb_asm.jmp($existing_side_exit);
+            ocb_asm.compile(ocb);
+
+            // Pointer to the side-exit code
+            code_ptr.as_side_exit()
+        }
+    };
+}

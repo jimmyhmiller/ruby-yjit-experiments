@@ -5,7 +5,7 @@
 use crate::asm::arm64::*;
 use crate::asm::CodeBlock;
 use crate::backend::ir::*;
-use crate::codegen::{CodegenGlobals, JITState};
+use crate::codegen::CodegenGlobals;
 use crate::cruby::*;
 use crate::virtualmem::CodePtr;
 
