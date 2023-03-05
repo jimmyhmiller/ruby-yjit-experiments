@@ -541,6 +541,7 @@ fn write_rm_unary(cb: &mut CodeBlock, op_mem_reg_8: u8, op_mem_reg_pref: u8, op_
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 // Encode an add-like RM instruction with multiple possible encodings
 fn write_rm_multi(cb: &mut CodeBlock, op_mem_reg8: u8, op_mem_reg_pref: u8, op_reg_mem8: u8, op_reg_mem_pref: u8, op_mem_imm8: u8, op_mem_imm_sml: u8, op_mem_imm_lrg: u8, op_ext_imm: Option<u8>, opnd0: X86Opnd, opnd1: X86Opnd) {
     assert!(matches!(opnd0, X86Opnd::Reg(_) | X86Opnd::Mem(_)));

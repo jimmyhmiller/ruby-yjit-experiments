@@ -197,7 +197,7 @@ fn verify_ctx(jit: &JITState, ctx: &Context) {
     let top_idx = cmp::min(ctx.get_stack_size(), MAX_TEMP_TYPES as u8);
     for i in 0..top_idx {
         let (learned_mapping, learned_type) = ctx.get_opnd_mapping(YARVOpnd::StackOpnd(i));
-        let stack_val = jit.peek_at_stack(&ctx, i as isize);
+        let stack_val = jit.peek_at_stack(ctx, i as isize);
         let val_type = Type::from(stack_val);
 
         match learned_mapping {
@@ -762,7 +762,7 @@ impl CodeGenerator {
                     .pc
                     .offset(insn_len(self.jit.opcode).try_into().unwrap())
             };
-            let exit_pos = gen_outlined_exit(exit_pc, &reset_depth, &mut self.get_ocb());
+            let exit_pos = gen_outlined_exit(exit_pc, &reset_depth, self.get_ocb());
             record_global_inval_patch(&mut self.asm, exit_pos);
             self.jit.record_boundary_patch_point = false;
         }
@@ -792,7 +792,7 @@ impl CodeGenerator {
             block.entry_exit = Some(gen_outlined_exit(
                 block_entry_pc,
                 &block_ctx,
-                &mut self.get_ocb(),
+                self.get_ocb(),
             ));
         }
     }
@@ -867,7 +867,7 @@ impl CodeGenerator {
             &next_ctx,
             &branch_rc,
             &mut branch,
-            &mut self.get_ocb(),
+            self.get_ocb(),
         );
 
         // Call the branch generation function
@@ -4258,7 +4258,7 @@ impl CodeGenerator {
             return CodegenStatus::CantCompile;
         }
 
-        if c_method_tracing_currently_enabled(&mut self.jit) {
+        if c_method_tracing_currently_enabled(&self.jit) {
             // Don't JIT if tracing c_call or c_return
             gen_counter_incr!(&mut self.asm, send_cfunc_tracing);
             return CodegenStatus::CantCompile;
@@ -5254,7 +5254,7 @@ impl CodeGenerator {
             assert!(argc >= required_num);
 
             // We are going to allocate so setting pc and sp.
-            jit_save_pc(&mut self.jit, &mut self.asm);
+            jit_save_pc(&self.jit, &mut self.asm);
             gen_save_sp(&mut self.asm, &mut self.ctx);
 
             let n = (argc - required_num) as u32;
@@ -5296,7 +5296,7 @@ impl CodeGenerator {
             .store(Opnd::mem(64, CFP, RUBY_OFFSET_CFP_SP), caller_sp);
 
         // Store the next PC in the current frame
-        jit_save_pc(&mut self.jit, &mut self.asm);
+        jit_save_pc(&self.jit, &mut self.asm);
 
         // Adjust the callee's stack pointer
         let offs = (SIZEOF_VALUE as isize)
@@ -5648,7 +5648,7 @@ impl CodeGenerator {
                         return CodegenStatus::CantCompile;
                     }
 
-                    if c_method_tracing_currently_enabled(&mut self.jit) {
+                    if c_method_tracing_currently_enabled(&self.jit) {
                         // Can't generate code for firing c_call and c_return events
                         // :attr-tracing:
                         // Handling the C method tracing events for attr_accessor
@@ -5689,7 +5689,7 @@ impl CodeGenerator {
                     } else if argc != 1 || unsafe { !RB_TYPE_P(comptime_recv, RUBY_T_OBJECT) } {
                         gen_counter_incr!(&mut self.asm, send_ivar_set_method);
                         return CodegenStatus::CantCompile;
-                    } else if c_method_tracing_currently_enabled(&mut self.jit) {
+                    } else if c_method_tracing_currently_enabled(&self.jit) {
                         // Can't generate code for firing c_call and c_return events
                         // See :attr-tracing:
                         gen_counter_incr!(&mut self.asm, send_cfunc_tracing);
@@ -6877,7 +6877,7 @@ impl CodeGenerator {
     fn get_side_exit(&mut self, ctx: &Context) -> Target {
         match self.jit.side_exit_for_pc {
             None => {
-                let exit_code = gen_outlined_exit(self.jit.pc, ctx, &mut self.get_ocb());
+                let exit_code = gen_outlined_exit(self.jit.pc, ctx, self.get_ocb());
                 self.jit.side_exit_for_pc = Some(exit_code);
                 exit_code.as_side_exit()
             }
