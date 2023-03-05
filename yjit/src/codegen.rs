@@ -24,32 +24,31 @@ use crate::core::{
 // missing abstraction. I could be wrong. But I'd rather start here and see.
 // If I want to change it back to * later, it is easy to do.
 use crate::cruby::{
-    block_type_iseq, cstr_to_rust_string, get_call_data_ci, get_cfp_ep, get_cikw_keyword_len,
-    get_cikw_keywords_idx, get_cme_def_body_attr_id, get_cme_def_body_cfunc,
-    get_cme_def_body_optimized_index, get_cme_def_body_optimized_type, get_cme_def_type,
-    get_def_iseq_ptr, get_def_method_serial, get_def_original_id, get_ec_cfp,
-    get_iseq_body_local_iseq, get_iseq_body_local_table_size, get_iseq_body_param_keyword,
-    get_iseq_body_param_lead_num, get_iseq_body_param_opt_num, get_iseq_body_param_opt_table,
-    get_iseq_body_param_size, get_iseq_body_stack_max, get_iseq_encoded_size,
-    get_iseq_flags_accepts_no_kwarg, get_iseq_flags_ambiguous_param0, get_iseq_flags_has_block,
-    get_iseq_flags_has_kw, get_iseq_flags_has_kwrest, get_iseq_flags_has_lead,
-    get_iseq_flags_has_opt, get_iseq_flags_has_post, get_iseq_flags_has_rest,
-    get_iseq_flags_ruby2_keywords, get_mct_argc, get_mct_func, idRespond_to_missing,
-    imemo_callinfo, insn_len, insn_name, iseq_inline_constant_cache, rb_IMEMO_TYPE_P,
-    rb_aliased_callable_method_entry, rb_ary_clear, rb_ary_entry_internal, rb_ary_resurrect,
-    rb_ary_store, rb_ary_tmp_new_from_values, rb_backref_get, rb_block_param_proxy,
-    rb_builtin_function, rb_cArray, rb_cBasicObject, rb_cFalseClass, rb_cFloat, rb_cHash,
-    rb_cInteger, rb_cModule, rb_cNilClass, rb_cString, rb_cSymbol, rb_cThread, rb_cTrueClass,
-    rb_c_method_tracing_currently_enabled, rb_call_data, rb_callable_method_entry,
+    block_type_iseq, get_call_data_ci, get_cfp_ep, get_cikw_keyword_len, get_cikw_keywords_idx,
+    get_cme_def_body_attr_id, get_cme_def_body_cfunc, get_cme_def_body_optimized_index,
+    get_cme_def_body_optimized_type, get_cme_def_type, get_def_iseq_ptr, get_def_method_serial,
+    get_def_original_id, get_ec_cfp, get_iseq_body_local_iseq, get_iseq_body_local_table_size,
+    get_iseq_body_param_keyword, get_iseq_body_param_lead_num, get_iseq_body_param_opt_num,
+    get_iseq_body_param_opt_table, get_iseq_body_param_size, get_iseq_body_stack_max,
+    get_iseq_encoded_size, get_iseq_flags_accepts_no_kwarg, get_iseq_flags_ambiguous_param0,
+    get_iseq_flags_has_block, get_iseq_flags_has_kw, get_iseq_flags_has_kwrest,
+    get_iseq_flags_has_lead, get_iseq_flags_has_opt, get_iseq_flags_has_post,
+    get_iseq_flags_has_rest, get_iseq_flags_ruby2_keywords, get_mct_argc, get_mct_func,
+    idRespond_to_missing, imemo_callinfo, insn_len, insn_name, iseq_inline_constant_cache,
+    rb_IMEMO_TYPE_P, rb_aliased_callable_method_entry, rb_ary_clear, rb_ary_entry_internal,
+    rb_ary_resurrect, rb_ary_store, rb_ary_tmp_new_from_values, rb_backref_get,
+    rb_block_param_proxy, rb_builtin_function, rb_cArray, rb_cBasicObject, rb_cFalseClass,
+    rb_cFloat, rb_cHash, rb_cInteger, rb_cModule, rb_cNilClass, rb_cString, rb_cSymbol, rb_cThread,
+    rb_cTrueClass, rb_c_method_tracing_currently_enabled, rb_call_data, rb_callable_method_entry,
     rb_callable_method_entry_or_negative, rb_callable_method_entry_t, rb_callinfo,
-    rb_captured_block, rb_class2name, rb_class_allocate_instance, rb_class_attached_object,
+    rb_captured_block, rb_class_allocate_instance, rb_class_attached_object,
     rb_class_get_superclass, rb_ec_ary_new_from_values, rb_ec_str_resurrect,
     rb_ensure_iv_list_size, rb_execution_context_struct, rb_fix_mod_fix, rb_full_cfunc_return,
     rb_gc_writebarrier, rb_get_alloc_func, rb_get_def_bmethod_proc, rb_get_iseq_body_local_iseq,
     rb_get_iseq_body_param_lead_num, rb_get_iseq_body_parent_iseq, rb_get_symbol_id, rb_gvar_get,
     rb_gvar_set, rb_hash_aref, rb_hash_aset, rb_hash_bulk_insert, rb_hash_new,
     rb_hash_new_with_size, rb_hash_resurrect, rb_hash_stlike_foreach, rb_hash_stlike_lookup,
-    rb_id2name, rb_intern, rb_iseq_opcode_at_pc, rb_iseq_pc_at_idx, rb_iseq_t, rb_ivar_get,
+    rb_intern, rb_iseq_opcode_at_pc, rb_iseq_pc_at_idx, rb_iseq_t, rb_ivar_get,
     rb_leaf_builtin_function, rb_mKernel, rb_mRubyVMFrozenCore, rb_method_definition_t,
     rb_method_entry_at, rb_obj_as_string_result, rb_obj_class, rb_obj_info, rb_obj_is_kind_of,
     rb_optimized_call, rb_range_new, rb_reg_last_match, rb_reg_match_last, rb_reg_match_post,
@@ -5553,6 +5552,7 @@ impl CodeGenerator {
         // Log the name of the method we're calling to
         #[cfg(feature = "disasm")]
         {
+            use crate::cruby::{cstr_to_rust_string, rb_class2name, rb_id2name};
             let class_name = unsafe { cstr_to_rust_string(rb_class2name(comptime_recv_klass)) };
             let method_name = unsafe { cstr_to_rust_string(rb_id2name(mid)) };
             if let (Some(class_name), Some(method_name)) = (class_name, method_name) {

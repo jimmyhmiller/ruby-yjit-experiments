@@ -8,8 +8,8 @@ use crate::asm::x86_64::*;
 use crate::asm::*;
 use crate::backend::ir::*;
 use crate::codegen::CodegenGlobals;
-use crate::jit_state::JITState;
 use crate::cruby::*;
+use crate::jit_state::JITState;
 
 // Use the x86 register type for this platform
 pub type Reg = X86Reg;
