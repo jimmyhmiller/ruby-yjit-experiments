@@ -11,7 +11,7 @@ use std::slice;
 
 use crate::asm::{CodeBlock, OutlinedCb};
 use crate::backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP};
-use crate::call_flags::CallFlags;
+use crate::call_info::{CallInfo};
 use crate::core::{
     free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump,
     get_or_create_iseq_payload, limit_block_versions, make_branch_entry, set_branch_target,
@@ -60,31 +60,30 @@ use crate::cruby::{
     rb_vm_frame_method_entry, rb_vm_getclassvariable, rb_vm_ic_hit_p, rb_vm_set_ivar_id,
     rb_vm_setclassvariable, rb_vm_setinstancevariable, rb_vm_splat_array, rb_yjit_array_len,
     rb_yjit_get_proc_ptr, rb_yjit_str_simple_append, ruby_basic_operators, st_data_t, vm_ci_argc,
-    vm_ci_flag, vm_ci_kwarg, vm_ci_mid, EcPtr, IseqPtr, Qfalse, Qnil, Qtrue, Qundef, RBasic,
-    RedefinitionFlag, YARVINSN_opt_getconstant_path, YARVINSN_putobject_INT2FIX_0_,
-    ARRAY_REDEFINED_OP_FLAG, BASIC_OP_UNREDEFINED_P, BOP_AND, BOP_AREF, BOP_EQ, BOP_EQQ,
-    BOP_FREEZE, BOP_GE, BOP_GT, BOP_LE, BOP_LT, BOP_MINUS, BOP_MOD, BOP_OR, BOP_PLUS, BOP_UMINUS,
-    FL_TEST, FL_TEST_RAW, HASH_REDEFINED_OP_FLAG, ID, INTEGER_REDEFINED_OP_FLAG, METHOD_ENTRY_VISI,
-    METHOD_VISI_PRIVATE, METHOD_VISI_PROTECTED, METHOD_VISI_PUBLIC, METHOD_VISI_UNDEF,
-    OBJ_TOO_COMPLEX_SHAPE_ID, OPTIMIZED_METHOD_TYPE_BLOCK_CALL, OPTIMIZED_METHOD_TYPE_CALL,
-    OPTIMIZED_METHOD_TYPE_SEND, OPTIMIZED_METHOD_TYPE_STRUCT_AREF,
-    OPTIMIZED_METHOD_TYPE_STRUCT_ASET, RARRAY_EMBED_FLAG, RARRAY_EMBED_LEN_MASK,
-    RARRAY_EMBED_LEN_SHIFT, RB_TYPE_P, RCLASS_ORIGIN, RHASH_PASS_AS_KEYWORDS,
-    RMODULE_IS_REFINEMENT, ROBJECT_EMBED, ROBJECT_OFFSET_AS_ARY, ROBJECT_OFFSET_AS_HEAP_IVPTR,
-    RSTRUCT_EMBED_LEN_MASK, RSTRUCT_LEN, RSTRUCT_SET, RUBY_ENCODING_MASK, RUBY_FIXNUM_FLAG,
-    RUBY_FLONUM_FLAG, RUBY_FLONUM_MASK, RUBY_FL_FREEZE, RUBY_FL_SINGLETON, RUBY_IMMEDIATE_MASK,
-    RUBY_OFFSET_CFP_BLOCK_CODE, RUBY_OFFSET_CFP_BP, RUBY_OFFSET_CFP_EP, RUBY_OFFSET_CFP_ISEQ,
-    RUBY_OFFSET_CFP_JIT_RETURN, RUBY_OFFSET_CFP_PC, RUBY_OFFSET_CFP_SELF, RUBY_OFFSET_CFP_SP,
-    RUBY_OFFSET_EC_CFP, RUBY_OFFSET_EC_INTERRUPT_FLAG, RUBY_OFFSET_EC_THREAD_PTR,
-    RUBY_OFFSET_ICE_VALUE, RUBY_OFFSET_IC_ENTRY, RUBY_OFFSET_RARRAY_AS_ARY,
-    RUBY_OFFSET_RARRAY_AS_HEAP_LEN, RUBY_OFFSET_RARRAY_AS_HEAP_PTR, RUBY_OFFSET_RBASIC_FLAGS,
-    RUBY_OFFSET_RBASIC_KLASS, RUBY_OFFSET_RSTRING_AS_HEAP_LEN, RUBY_OFFSET_RSTRING_EMBED_LEN,
-    RUBY_OFFSET_RSTRUCT_AS_ARY, RUBY_OFFSET_RSTRUCT_AS_HEAP_PTR, RUBY_OFFSET_THREAD_SELF,
-    RUBY_SIZEOF_CONTROL_FRAME, RUBY_SPECIAL_SHIFT, RUBY_SYMBOL_FLAG, RUBY_T_ARRAY, RUBY_T_CLASS,
-    RUBY_T_HASH, RUBY_T_ICLASS, RUBY_T_MASK, RUBY_T_MODULE, RUBY_T_OBJECT, RUBY_T_STRING,
-    RUBY_T_STRUCT, SHAPE_ID_NUM_BITS, SIZEOF_VALUE, SIZEOF_VALUE_I32, STRING_REDEFINED_OP_FLAG,
-    ST_CONTINUE, ST_STOP, VALUE, VALUE_BITS, VM_BLOCK_HANDLER_NONE, VM_CALL_FCALL, VM_CALL_KWARG,
-    VM_CALL_KW_SPLAT, VM_CALL_OPT_SEND, VM_CALL_TAILCALL, VM_ENV_DATA_INDEX_FLAGS,
+    vm_ci_kwarg, vm_ci_mid, EcPtr, IseqPtr, Qfalse, Qnil, Qtrue, Qundef, RBasic, RedefinitionFlag,
+    YARVINSN_opt_getconstant_path, YARVINSN_putobject_INT2FIX_0_, ARRAY_REDEFINED_OP_FLAG,
+    BASIC_OP_UNREDEFINED_P, BOP_AND, BOP_AREF, BOP_EQ, BOP_EQQ, BOP_FREEZE, BOP_GE, BOP_GT, BOP_LE,
+    BOP_LT, BOP_MINUS, BOP_MOD, BOP_OR, BOP_PLUS, BOP_UMINUS, FL_TEST, FL_TEST_RAW,
+    HASH_REDEFINED_OP_FLAG, ID, INTEGER_REDEFINED_OP_FLAG, METHOD_ENTRY_VISI, METHOD_VISI_PRIVATE,
+    METHOD_VISI_PROTECTED, METHOD_VISI_PUBLIC, METHOD_VISI_UNDEF, OBJ_TOO_COMPLEX_SHAPE_ID,
+    OPTIMIZED_METHOD_TYPE_BLOCK_CALL, OPTIMIZED_METHOD_TYPE_CALL, OPTIMIZED_METHOD_TYPE_SEND,
+    OPTIMIZED_METHOD_TYPE_STRUCT_AREF, OPTIMIZED_METHOD_TYPE_STRUCT_ASET, RARRAY_EMBED_FLAG,
+    RARRAY_EMBED_LEN_MASK, RARRAY_EMBED_LEN_SHIFT, RB_TYPE_P, RCLASS_ORIGIN,
+    RHASH_PASS_AS_KEYWORDS, RMODULE_IS_REFINEMENT, ROBJECT_EMBED, ROBJECT_OFFSET_AS_ARY,
+    ROBJECT_OFFSET_AS_HEAP_IVPTR, RSTRUCT_EMBED_LEN_MASK, RSTRUCT_LEN, RSTRUCT_SET,
+    RUBY_ENCODING_MASK, RUBY_FIXNUM_FLAG, RUBY_FLONUM_FLAG, RUBY_FLONUM_MASK, RUBY_FL_FREEZE,
+    RUBY_FL_SINGLETON, RUBY_IMMEDIATE_MASK, RUBY_OFFSET_CFP_BLOCK_CODE, RUBY_OFFSET_CFP_BP,
+    RUBY_OFFSET_CFP_EP, RUBY_OFFSET_CFP_ISEQ, RUBY_OFFSET_CFP_JIT_RETURN, RUBY_OFFSET_CFP_PC,
+    RUBY_OFFSET_CFP_SELF, RUBY_OFFSET_CFP_SP, RUBY_OFFSET_EC_CFP, RUBY_OFFSET_EC_INTERRUPT_FLAG,
+    RUBY_OFFSET_EC_THREAD_PTR, RUBY_OFFSET_ICE_VALUE, RUBY_OFFSET_IC_ENTRY,
+    RUBY_OFFSET_RARRAY_AS_ARY, RUBY_OFFSET_RARRAY_AS_HEAP_LEN, RUBY_OFFSET_RARRAY_AS_HEAP_PTR,
+    RUBY_OFFSET_RBASIC_FLAGS, RUBY_OFFSET_RBASIC_KLASS, RUBY_OFFSET_RSTRING_AS_HEAP_LEN,
+    RUBY_OFFSET_RSTRING_EMBED_LEN, RUBY_OFFSET_RSTRUCT_AS_ARY, RUBY_OFFSET_RSTRUCT_AS_HEAP_PTR,
+    RUBY_OFFSET_THREAD_SELF, RUBY_SIZEOF_CONTROL_FRAME, RUBY_SPECIAL_SHIFT, RUBY_SYMBOL_FLAG,
+    RUBY_T_ARRAY, RUBY_T_CLASS, RUBY_T_HASH, RUBY_T_ICLASS, RUBY_T_MASK, RUBY_T_MODULE,
+    RUBY_T_OBJECT, RUBY_T_STRING, RUBY_T_STRUCT, SHAPE_ID_NUM_BITS, SIZEOF_VALUE, SIZEOF_VALUE_I32,
+    STRING_REDEFINED_OP_FLAG, ST_CONTINUE, ST_STOP, VALUE, VALUE_BITS, VM_BLOCK_HANDLER_NONE,
+    VM_CALL_FCALL, VM_CALL_KW_SPLAT, VM_CALL_OPT_SEND, VM_ENV_DATA_INDEX_FLAGS,
     VM_ENV_DATA_INDEX_ME_CREF, VM_ENV_DATA_INDEX_SPECVAL, VM_ENV_DATA_SIZE, VM_ENV_FLAG_LOCAL,
     VM_ENV_FLAG_WB_REQUIRED, VM_FRAME_FLAG_BMETHOD, VM_FRAME_FLAG_CFRAME, VM_FRAME_FLAG_CFRAME_KW,
     VM_FRAME_FLAG_LAMBDA, VM_FRAME_FLAG_MODIFIED_BLOCK_PARAM, VM_FRAME_MAGIC_BLOCK,
@@ -1666,9 +1665,9 @@ impl CodeGenerator {
     //   - receiver is in REG0
     //   - receiver has the same class as CLASS_OF(comptime_receiver)
     //   - no stack push or pops to ctx since the entry to the codegen of the instruction being compiled
-    fn gen_set_ivar(&mut self, ivar_name: ID, flags: CallFlags, argc: i32) -> CodegenStatus {
+    fn gen_set_ivar(&mut self, ivar_name: ID, call_info: CallInfo, argc: i32) -> CodegenStatus {
         // This is a .send call and we need to adjust the stack
-        if flags.is_opt_send() {
+        if call_info.flags.is_opt_send() {
             self.handle_opt_send_shift_stack(argc);
         }
 
@@ -4205,7 +4204,7 @@ impl CodeGenerator {
         cme: *const rb_callable_method_entry_t,
         block: Option<IseqPtr>,
         recv_known_klass: *const VALUE,
-        flags: CallFlags,
+        call_info: CallInfo,
         argc: i32,
     ) -> CodegenStatus {
         let cfunc = unsafe { get_cme_def_body_cfunc(cme) };
@@ -4222,12 +4221,12 @@ impl CodeGenerator {
         }
 
         // We aren't handling a vararg cfuncs with splat currently.
-        if flags.is_splat() && cfunc_argc == -1 {
+        if call_info.flags.is_splat() && cfunc_argc == -1 {
             gen_counter_incr!(&mut self.asm, send_args_splat_cfunc_var_args);
             return CodegenStatus::CantCompile;
         }
 
-        if flags.is_splat() && flags.is_zsuper() {
+        if call_info.flags.is_splat() && call_info.flags.is_zsuper() {
             // zsuper methods are super calls without any arguments.
             // They are also marked as splat, but don't actually have an array
             // they pull arguments from, instead we need to change to call
@@ -4241,7 +4240,7 @@ impl CodeGenerator {
         // with splat and changes they way they handle them.
         // We are just going to not compile these.
         // https://docs.ruby-lang.org/en/3.2/Module.html#method-i-ruby2_keywords
-        if unsafe { get_iseq_flags_ruby2_keywords(self.jit.iseq) && flags.is_splat() } {
+        if unsafe { get_iseq_flags_ruby2_keywords(self.jit.iseq) && call_info.flags.is_splat() } {
             gen_counter_incr!(&mut self.asm, send_args_splat_cfunc_ruby2_keywords);
             return CodegenStatus::CantCompile;
         }
@@ -4253,7 +4252,7 @@ impl CodeGenerator {
             unsafe { get_cikw_keyword_len(kw_arg) }
         };
 
-        if kw_arg_num != 0 && flags.is_splat() {
+        if kw_arg_num != 0 && call_info.flags.is_splat() {
             gen_counter_incr!(&mut self.asm, send_cfunc_splat_with_kw);
             return CodegenStatus::CantCompile;
         }
@@ -4265,7 +4264,7 @@ impl CodeGenerator {
         }
 
         // Delegate to codegen for C methods if we have it.
-        if kw_arg.is_null() && !flags.is_opt_send() {
+        if kw_arg.is_null() && !call_info.flags.is_opt_send() {
             let codegen_p = lookup_cfunc_codegen(unsafe { (*cme).def });
             if let Some(known_cfunc_codegen) = codegen_p {
                 if known_cfunc_codegen(self, ci, cme, block, argc, recv_known_klass) {
@@ -4301,7 +4300,7 @@ impl CodeGenerator {
         };
 
         // If the argument count doesn't match
-        if cfunc_argc >= 0 && cfunc_argc != passed_argc && !flags.is_splat() {
+        if cfunc_argc >= 0 && cfunc_argc != passed_argc && !call_info.flags.is_splat() {
             gen_counter_incr!(&mut self.asm, send_cfunc_argc_mismatch);
             return CodegenStatus::CantCompile;
         }
@@ -4312,7 +4311,7 @@ impl CodeGenerator {
             return CodegenStatus::CantCompile;
         }
 
-        let block_arg = flags.is_block_arg();
+        let block_arg = call_info.flags.is_block_arg();
         let block_arg_type = if block_arg {
             Some(self.ctx.get_opnd_type(YARVOpnd::StackOpnd(0)))
         } else {
@@ -4350,7 +4349,7 @@ impl CodeGenerator {
         }
 
         // push_splat_args does stack manipulation so we can no longer side exit
-        if flags.is_splat() {
+        if call_info.flags.is_splat() {
             assert!(cfunc_argc >= 0);
             let required_args: u32 = (cfunc_argc as u32).saturating_sub(argc as u32 - 1);
             // + 1 because we pass self
@@ -4370,7 +4369,7 @@ impl CodeGenerator {
         }
 
         // This is a .send call and we need to adjust the stack
-        if flags.is_opt_send() {
+        if call_info.flags.is_opt_send() {
             self.handle_opt_send_shift_stack(argc);
         }
 
@@ -4612,10 +4611,9 @@ impl CodeGenerator {
 
     fn gen_send_bmethod(
         &mut self,
-        ci: *const rb_callinfo,
         cme: *const rb_callable_method_entry_t,
         block: Option<IseqPtr>,
-        flags: CallFlags,
+        call_info: CallInfo,
         argc: i32,
     ) -> CodegenStatus {
         let procv = unsafe { rb_get_def_bmethod_proc((*cme).def) };
@@ -4647,12 +4645,11 @@ impl CodeGenerator {
         let frame_type = VM_FRAME_MAGIC_BLOCK | VM_FRAME_FLAG_BMETHOD | VM_FRAME_FLAG_LAMBDA;
         self.gen_send_iseq(
             iseq,
-            ci,
             frame_type,
             Some(capture.ep),
             cme,
             block,
-            flags,
+            call_info,
             argc,
             None,
         )
@@ -4661,12 +4658,11 @@ impl CodeGenerator {
     fn gen_send_iseq(
         &mut self,
         iseq: *const rb_iseq_t,
-        ci: *const rb_callinfo,
         frame_type: u32,
         prev_ep: Option<*const VALUE>,
         cme: *const rb_callable_method_entry_t,
         block: Option<IseqPtr>,
-        flags: CallFlags,
+        call_info: CallInfo,
         argc: i32,
         captured_opnd: Option<Opnd>,
     ) -> CodegenStatus {
@@ -4681,9 +4677,9 @@ impl CodeGenerator {
         // value is present on the stack in order to properly set up the callee's
         // stack pointer.
         let doing_kw_call = unsafe { get_iseq_flags_has_kw(iseq) };
-        let supplying_kws = unsafe { vm_ci_flag(ci) & VM_CALL_KWARG } != 0;
+        let supplying_kws = call_info.flags.is_kw_arg();
 
-        if unsafe { vm_ci_flag(ci) } & VM_CALL_TAILCALL != 0 {
+        if call_info.flags.is_tail_call() {
             // We can't handle tailcalls
             gen_counter_incr!(&mut self.asm, send_iseq_tailcall);
             return CodegenStatus::CantCompile;
@@ -4705,7 +4701,7 @@ impl CodeGenerator {
         // with splat and changes they way they handle them.
         // We are just going to not compile these.
         // https://www.rubydoc.info/stdlib/core/Proc:ruby2_keywords
-        if unsafe { get_iseq_flags_ruby2_keywords(self.jit.iseq) && flags.is_splat() } {
+        if unsafe { get_iseq_flags_ruby2_keywords(self.jit.iseq) && call_info.flags.is_splat() } {
             gen_counter_incr!(&mut self.asm, send_iseq_ruby2_keywords);
             return CodegenStatus::CantCompile;
         }
@@ -4716,12 +4712,12 @@ impl CodeGenerator {
             return CodegenStatus::CantCompile;
         }
 
-        if iseq_has_rest && flags.is_splat() {
+        if iseq_has_rest && call_info.flags.is_splat() {
             gen_counter_incr!(&mut self.asm, send_iseq_has_rest_and_splat);
             return CodegenStatus::CantCompile;
         }
 
-        if iseq_has_rest && flags.is_opt_send() {
+        if iseq_has_rest && call_info.flags.is_opt_send() {
             gen_counter_incr!(&mut self.asm, send_iseq_has_rest_and_send);
             return CodegenStatus::CantCompile;
         }
@@ -4767,7 +4763,7 @@ impl CodeGenerator {
             }
         }
 
-        if flags.is_splat() && flags.is_zsuper() {
+        if call_info.flags.is_splat() && call_info.flags.is_zsuper() {
             // zsuper methods are super calls without any arguments.
             // They are also marked as splat, but don't actually have an array
             // they pull arguments from, instead we need to change to call
@@ -4781,19 +4777,14 @@ impl CodeGenerator {
 
         // This struct represents the metadata about the caller-specified
         // keyword arguments.
-        let kw_arg = unsafe { vm_ci_kwarg(ci) };
-        let kw_arg_num = if kw_arg.is_null() {
-            0
-        } else {
-            unsafe { get_cikw_keyword_len(kw_arg) }
-        };
+        let kw_arg_num = call_info.kw_arg_count();
 
         // Arity handling and optional parameter setup
         let opts_filled = argc - required_num - kw_arg_num;
         let opt_num = unsafe { get_iseq_body_param_opt_num(iseq) };
         let opts_missing: i32 = opt_num - opts_filled;
 
-        if doing_kw_call && flags.is_splat() {
+        if doing_kw_call && call_info.flags.is_splat() {
             gen_counter_incr!(&mut self.asm, send_iseq_splat_with_kw);
             return CodegenStatus::CantCompile;
         }
@@ -4803,7 +4794,7 @@ impl CodeGenerator {
             return CodegenStatus::CantCompile;
         }
 
-        if opts_filled < 0 && !flags.is_splat() {
+        if opts_filled < 0 && !call_info.flags.is_splat() {
             // Too few arguments and no splat to make up for it
             gen_counter_incr!(&mut self.asm, send_iseq_arity_error);
             return CodegenStatus::CantCompile;
@@ -4815,7 +4806,7 @@ impl CodeGenerator {
             return CodegenStatus::CantCompile;
         }
 
-        let block_arg = flags.is_block_arg();
+        let block_arg = call_info.flags.is_block_arg();
         let block_arg_type = if block_arg {
             Some(self.ctx.get_opnd_type(YARVOpnd::StackOpnd(0)))
         } else {
@@ -4844,7 +4835,7 @@ impl CodeGenerator {
         }
 
         // We will handle splat case later
-        if opt_num > 0 && !flags.is_splat() {
+        if opt_num > 0 && !call_info.flags.is_splat() {
             num_params -= opts_missing as u32;
             unsafe {
                 let opt_table = get_iseq_body_param_opt_table(iseq);
@@ -4885,16 +4876,14 @@ impl CodeGenerator {
                 // same order as the order specified in the callee declaration, then
                 // we're going to need to generate some code to swap values around
                 // on the stack.
-                let kw_arg_keyword_len: usize =
-                    unsafe { get_cikw_keyword_len(kw_arg) }.try_into().unwrap();
+                let kw_arg_keyword_len: usize = kw_arg_num.try_into().unwrap();
                 let mut caller_kwargs: Vec<ID> = vec![0; kw_arg_keyword_len];
                 for (kwarg_idx, kwarg) in caller_kwargs
                     .iter_mut()
                     .enumerate()
                     .take(kw_arg_keyword_len)
                 {
-                    let sym =
-                        unsafe { get_cikw_keywords_idx(kw_arg, kwarg_idx.try_into().unwrap()) };
+                    let sym = call_info.get_keyword_arg_symbol(kwarg_idx);
                     *kwarg = unsafe { rb_sym2id(sym) };
                 }
 
@@ -4959,7 +4948,7 @@ impl CodeGenerator {
         };
         if let (None, Some(builtin_info)) = (block, leaf_builtin) {
             // this is a .send call not currently supported for builtins
-            if flags.is_opt_send() {
+            if call_info.flags.is_opt_send() {
                 gen_counter_incr!(&mut self.asm, send_send_builtin);
                 return CodegenStatus::CantCompile;
             }
@@ -5015,7 +5004,7 @@ impl CodeGenerator {
             && unsafe { get_iseq_flags_has_lead(iseq) && !get_iseq_flags_ambiguous_param0(iseq) };
 
         // push_splat_args does stack manipulation so we can no longer side exit
-        if flags.is_splat() {
+        if call_info.flags.is_splat() {
             // If block_arg0_splat, we still need side exits after this, but
             // doing push_splat_args here disallows it. So bail out.
             if block_arg0_splat {
@@ -5063,7 +5052,7 @@ impl CodeGenerator {
         }
 
         // This is a .send call and we need to adjust the stack
-        if flags.is_opt_send() {
+        if call_info.flags.is_opt_send() {
             self.handle_opt_send_shift_stack(argc);
         }
 
@@ -5084,14 +5073,7 @@ impl CodeGenerator {
 
             // This struct represents the metadata about the caller-specified
             // keyword arguments.
-            let ci_kwarg = unsafe { vm_ci_kwarg(ci) };
-            let caller_keyword_len: usize = if ci_kwarg.is_null() {
-                0
-            } else {
-                unsafe { get_cikw_keyword_len(ci_kwarg) }
-                    .try_into()
-                    .unwrap()
-            };
+            let caller_keyword_len: usize = call_info.kw_arg_count() as usize;
 
             // This struct represents the metadata about the callee-specified
             // keyword parameters.
@@ -5116,7 +5098,7 @@ impl CodeGenerator {
                 .enumerate()
                 .take(caller_keyword_len)
             {
-                let sym = unsafe { get_cikw_keywords_idx(ci_kwarg, kwarg_idx.try_into().unwrap()) };
+                let sym = call_info.get_keyword_arg_symbol(kwarg_idx);
                 *kwargs = unsafe { rb_sym2id(sym) };
             }
             let mut kwarg_idx = caller_keyword_len;
@@ -5405,7 +5387,7 @@ impl CodeGenerator {
         ci: *const rb_callinfo,
         cme: *const rb_callable_method_entry_t,
         comptime_recv: VALUE,
-        flags: CallFlags,
+        call_info: CallInfo,
         argc: i32,
     ) -> CodegenStatus {
         if unsafe { vm_ci_argc(ci) } != 0 {
@@ -5430,7 +5412,7 @@ impl CodeGenerator {
         }
 
         // This is a .send call and we need to adjust the stack
-        if flags.is_opt_send() {
+        if call_info.flags.is_opt_send() {
             self.handle_opt_send_shift_stack(argc);
         }
 
@@ -5469,7 +5451,7 @@ impl CodeGenerator {
         ci: *const rb_callinfo,
         cme: *const rb_callable_method_entry_t,
         comptime_recv: VALUE,
-        flags: CallFlags,
+        call_info: CallInfo,
         argc: i32,
     ) -> CodegenStatus {
         if unsafe { vm_ci_argc(ci) } != 1 {
@@ -5477,7 +5459,7 @@ impl CodeGenerator {
         }
 
         // This is a .send call and we need to adjust the stack
-        if flags.is_opt_send() {
+        if call_info.flags.is_opt_send() {
             self.handle_opt_send_shift_stack(argc);
         }
 
@@ -5524,10 +5506,10 @@ impl CodeGenerator {
         let ci = unsafe { get_call_data_ci(cd) }; // info about the call site
         let mut argc: i32 = unsafe { vm_ci_argc(ci) }.try_into().unwrap();
         let mut mid = unsafe { vm_ci_mid(ci) };
-        let mut flags = CallFlags::from_ci(ci);
+        let mut call_info = CallInfo::new(ci);
 
         // Don't JIT calls with keyword splat
-        if flags.is_kw_splat() {
+        if call_info.flags.is_kw_splat() {
             gen_counter_incr!(&mut self.asm, send_kw_splat);
             return CodegenStatus::CantCompile;
         }
@@ -5538,7 +5520,7 @@ impl CodeGenerator {
             return CodegenStatus::EndBlock;
         }
 
-        let recv_idx = argc + if flags.is_block_arg() { 1 } else { 0 };
+        let recv_idx = argc + if call_info.flags.is_block_arg() { 1 } else { 0 };
         let comptime_recv = self.jit.peek_at_stack(&self.ctx, recv_idx as isize);
         let comptime_recv_klass = comptime_recv.class_of();
 
@@ -5593,7 +5575,7 @@ impl CodeGenerator {
                 // Can always call public methods
             }
             METHOD_VISI_PRIVATE => {
-                if !flags.is_fcall() {
+                if !call_info.flags.is_fcall() {
                     // Can only call private methods with FCALL callsites.
                     // (at the moment they are callsites without a receiver or an explicit `self` receiver)
                     return CodegenStatus::CantCompile;
@@ -5601,7 +5583,7 @@ impl CodeGenerator {
             }
             METHOD_VISI_PROTECTED => {
                 // If the method call is an FCALL, it is always valid
-                if !flags.is_fcall() {
+                if !call_info.flags.is_fcall() {
                     // otherwise we need an ancestry check to ensure the receiver is valid to be called
                     // as protected
                     self.jit_protected_callee_ancestry_guard(cme, side_exit);
@@ -5625,13 +5607,13 @@ impl CodeGenerator {
                     let iseq = unsafe { get_def_iseq_ptr((*cme).def) };
                     let frame_type = VM_FRAME_MAGIC_METHOD | VM_ENV_FLAG_LOCAL;
                     return self
-                        .gen_send_iseq(iseq, ci, frame_type, None, cme, block, flags, argc, None);
+                        .gen_send_iseq(iseq, frame_type, None, cme, block, call_info, argc, None);
                 }
                 VM_METHOD_TYPE_CFUNC => {
-                    return self.gen_send_cfunc(ci, cme, block, &comptime_recv_klass, flags, argc);
+                    return self.gen_send_cfunc(ci, cme, block, &comptime_recv_klass, call_info, argc);
                 }
                 VM_METHOD_TYPE_IVAR => {
-                    if flags.is_splat() {
+                    if call_info.flags.is_splat() {
                         gen_counter_incr!(&mut self.asm, send_args_splat_ivar);
                         return CodegenStatus::CantCompile;
                     }
@@ -5643,7 +5625,7 @@ impl CodeGenerator {
                     }
 
                     // This is a .send call not supported right now for getters
-                    if flags.is_opt_send() {
+                    if call_info.flags.is_opt_send() {
                         gen_counter_incr!(&mut self.asm, send_send_getter);
                         return CodegenStatus::CantCompile;
                     }
@@ -5664,7 +5646,7 @@ impl CodeGenerator {
 
                     let ivar_name = unsafe { get_cme_def_body_attr_id(cme) };
 
-                    if flags.is_block_arg() {
+                    if call_info.flags.is_block_arg() {
                         gen_counter_incr!(&mut self.asm, send_block_arg);
                         return CodegenStatus::CantCompile;
                     }
@@ -5679,11 +5661,11 @@ impl CodeGenerator {
                     );
                 }
                 VM_METHOD_TYPE_ATTRSET => {
-                    if flags.is_splat() {
+                    if call_info.flags.is_splat() {
                         gen_counter_incr!(&mut self.asm, send_args_splat_attrset);
                         return CodegenStatus::CantCompile;
                     }
-                    if flags.is_kw_arg() {
+                    if call_info.flags.is_kw_arg() {
                         gen_counter_incr!(&mut self.asm, send_attrset_kwargs);
                         return CodegenStatus::CantCompile;
                     } else if argc != 1 || unsafe { !RB_TYPE_P(comptime_recv, RUBY_T_OBJECT) } {
@@ -5694,21 +5676,21 @@ impl CodeGenerator {
                         // See :attr-tracing:
                         gen_counter_incr!(&mut self.asm, send_cfunc_tracing);
                         return CodegenStatus::CantCompile;
-                    } else if flags.is_block_arg() {
+                    } else if call_info.flags.is_block_arg() {
                         gen_counter_incr!(&mut self.asm, send_block_arg);
                         return CodegenStatus::CantCompile;
                     } else {
                         let ivar_name = unsafe { get_cme_def_body_attr_id(cme) };
-                        return self.gen_set_ivar(ivar_name, flags, argc);
+                        return self.gen_set_ivar(ivar_name, call_info, argc);
                     }
                 }
                 // Block method, e.g. define_method(:foo) { :my_block }
                 VM_METHOD_TYPE_BMETHOD => {
-                    if flags.is_splat() {
+                    if call_info.flags.is_splat() {
                         gen_counter_incr!(&mut self.asm, send_args_splat_bmethod);
                         return CodegenStatus::CantCompile;
                     }
-                    return self.gen_send_bmethod(ci, cme, block, flags, argc);
+                    return self.gen_send_bmethod(cme, block, call_info, argc);
                 }
                 VM_METHOD_TYPE_ALIAS => {
                     // Retrieve the aliased method and re-enter the switch
@@ -5717,7 +5699,7 @@ impl CodeGenerator {
                 }
                 // Send family of methods, e.g. call/apply
                 VM_METHOD_TYPE_OPTIMIZED => {
-                    if flags.is_block_arg() {
+                    if call_info.flags.is_block_arg() {
                         gen_counter_incr!(&mut self.asm, send_block_arg);
                         return CodegenStatus::CantCompile;
                     }
@@ -5737,7 +5719,7 @@ impl CodeGenerator {
                             // many levels deep we need to stack manipulate. Because of how exits
                             // currently work, we can't do stack manipulation until we will no longer
                             // side exit.
-                            if flags.is_opt_send() {
+                            if call_info.flags.is_opt_send() {
                                 gen_counter_incr!(&mut self.asm, send_send_nested);
                                 return CodegenStatus::CantCompile;
                             }
@@ -5769,7 +5751,7 @@ impl CodeGenerator {
                                 return CodegenStatus::CantCompile;
                             }
 
-                            flags |= VM_CALL_FCALL | VM_CALL_OPT_SEND;
+                            call_info.flags |= VM_CALL_FCALL | VM_CALL_OPT_SEND;
 
                             assume_method_lookup_stable(self, cme);
 
@@ -5824,7 +5806,7 @@ impl CodeGenerator {
                                 chain_exit,
                             );
 
-                            // We have changed the argc, flags, mid, and cme, so we need to re-enter the match
+                            // We have changed the argc, call_info.flags, mid, and cme, so we need to re-enter the match
                             // and compile whatever method we found from send.
                             continue;
                         }
@@ -5834,12 +5816,12 @@ impl CodeGenerator {
                                 return CodegenStatus::CantCompile;
                             }
 
-                            if flags.is_kw_arg() {
+                            if call_info.flags.is_kw_arg() {
                                 gen_counter_incr!(&mut self.asm, send_call_kwarg);
                                 return CodegenStatus::CantCompile;
                             }
 
-                            if flags.is_splat() {
+                            if call_info.flags.is_splat() {
                                 gen_counter_incr!(&mut self.asm, send_args_splat_opt_call);
                                 return CodegenStatus::CantCompile;
                             }
@@ -5852,7 +5834,7 @@ impl CodeGenerator {
                             }
 
                             // If this is a .send call we need to adjust the stack
-                            if flags.is_opt_send() {
+                            if call_info.flags.is_opt_send() {
                                 self.handle_opt_send_shift_stack(argc);
                             }
 
@@ -5864,7 +5846,7 @@ impl CodeGenerator {
                             // Save the PC and SP because the callee can make Ruby calls
                             self.jit_prepare_routine_call();
 
-                            let kw_splat = flags & VM_CALL_KW_SPLAT;
+                            let kw_splat = call_info.flags & VM_CALL_KW_SPLAT;
                             let stack_argument_pointer =
                                 self.asm.lea(Opnd::mem(64, sp, -(argc) * SIZEOF_VALUE_I32));
 
@@ -5891,18 +5873,18 @@ impl CodeGenerator {
                             return CodegenStatus::CantCompile;
                         }
                         OPTIMIZED_METHOD_TYPE_STRUCT_AREF => {
-                            if flags.is_splat() {
+                            if call_info.flags.is_splat() {
                                 gen_counter_incr!(&mut self.asm, send_args_splat_aref);
                                 return CodegenStatus::CantCompile;
                             }
-                            return self.gen_struct_aref(ci, cme, comptime_recv, flags, argc);
+                            return self.gen_struct_aref(ci, cme, comptime_recv, call_info, argc);
                         }
                         OPTIMIZED_METHOD_TYPE_STRUCT_ASET => {
-                            if flags.is_splat() {
+                            if call_info.flags.is_splat() {
                                 gen_counter_incr!(&mut self.asm, send_args_splat_aset);
                                 return CodegenStatus::CantCompile;
                             }
-                            return self.gen_struct_aset(ci, cme, comptime_recv, flags, argc);
+                            return self.gen_struct_aset(ci, cme, comptime_recv, call_info, argc);
                         }
                         _ => {
                             panic!("unknown optimized method type!")
@@ -5977,7 +5959,7 @@ impl CodeGenerator {
         let cd = self.jit.get_arg(0).as_ptr();
         let ci = unsafe { get_call_data_ci(cd) };
         let argc: i32 = unsafe { vm_ci_argc(ci) }.try_into().unwrap();
-        let flags = CallFlags::from_ci(ci);
+        let call_info = CallInfo::new(ci);
 
         // Get block_handler
         let cfp = unsafe { get_ec_cfp(self.jit.ec.unwrap()) };
@@ -6037,23 +6019,22 @@ impl CodeGenerator {
 
             self.gen_send_iseq(
                 comptime_iseq,
-                ci,
                 VM_FRAME_MAGIC_BLOCK,
                 None,
                 0 as _,
                 None,
-                flags,
+                call_info,
                 argc,
                 Some(captured_opnd),
             )
         } else if comptime_handler.0 & 0x3 == 0x3 {
             // VM_BH_IFUNC_P
             // We aren't handling CALLER_SETUP_ARG and CALLER_REMOVE_EMPTY_KW_SPLAT yet.
-            if flags.is_splat() {
+            if call_info.flags.is_splat() {
                 gen_counter_incr!(&mut self.asm, invokeblock_ifunc_args_splat);
                 return CodegenStatus::CantCompile;
             }
-            if flags.is_kw_splat() {
+            if call_info.flags.is_kw_splat() {
                 gen_counter_incr!(&mut self.asm, invokeblock_ifunc_kw_splat);
                 return CodegenStatus::CantCompile;
             }
@@ -6164,21 +6145,20 @@ impl CodeGenerator {
 
         let ci = unsafe { get_call_data_ci(cd) };
         let argc: i32 = unsafe { vm_ci_argc(ci) }.try_into().unwrap();
-
-        let ci_flags = CallFlags::from_ci(ci);
+        let call_info = CallInfo::new(ci);
 
         // Don't JIT calls that aren't simple
         // Note, not using VM_CALL_ARGS_SIMPLE because sometimes we pass a block.
 
-        if ci_flags.is_kw_arg() {
+        if call_info.flags.is_kw_arg() {
             gen_counter_incr!(&mut self.asm, send_keywords);
             return CodegenStatus::CantCompile;
         }
-        if ci_flags.is_kw_splat() {
+        if call_info.flags.is_kw_splat() {
             gen_counter_incr!(&mut self.asm, send_kw_splat);
             return CodegenStatus::CantCompile;
         }
-        if ci_flags.is_block_arg() {
+        if call_info.flags.is_block_arg() {
             gen_counter_incr!(&mut self.asm, send_block_arg);
             return CodegenStatus::CantCompile;
         }
@@ -6246,10 +6226,10 @@ impl CodeGenerator {
             VM_METHOD_TYPE_ISEQ => {
                 let iseq = unsafe { get_def_iseq_ptr((*cme).def) };
                 let frame_type = VM_FRAME_MAGIC_METHOD | VM_ENV_FLAG_LOCAL;
-                self.gen_send_iseq(iseq, ci, frame_type, None, cme, block, ci_flags, argc, None)
+                self.gen_send_iseq(iseq, frame_type, None, cme, block, call_info, argc, None)
             }
             VM_METHOD_TYPE_CFUNC => {
-                self.gen_send_cfunc(ci, cme, block, ptr::null(), ci_flags, argc)
+                self.gen_send_cfunc(ci, cme, block, ptr::null(), call_info, argc)
             }
             _ => unreachable!(),
         }

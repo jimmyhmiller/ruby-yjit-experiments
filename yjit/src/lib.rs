@@ -1,6 +1,6 @@
 mod asm;
 mod backend;
-mod call_flags;
+mod call_info;
 mod codegen;
 mod core;
 mod cruby;
