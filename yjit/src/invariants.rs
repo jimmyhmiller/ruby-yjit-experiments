@@ -1,12 +1,23 @@
 //! Code to track assumptions made during code generation and invalidate
 //! generated code if and when these assumptions are invalidated.
 
-use crate::codegen::*;
-use crate::core::*;
-use crate::cruby::*;
+use crate::block::BlockId;
+use crate::block::BlockRef;
+use crate::codegen::{CodeGenerator, CodegenGlobals};
+use crate::core::{
+    delayed_deallocation, for_each_iseq, for_each_on_stack_iseq, free_block, get_iseq_payload,
+    invalidate_block_version, take_version_list,
+};
+use crate::cruby::{
+    get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL, rb_callable_method_entry,
+    rb_callable_method_entry_t, rb_gc_mark, rb_iseq_reset_jit_func, rb_iseq_t,
+    rb_method_basic_definition_p, rb_vm_insn_decode, rb_yjit_multi_ractor_p, ruby_basic_operators,
+    src_loc, with_vm_lock, RedefinitionFlag, YARVINSN_opt_getconstant_path, FL_TEST, IC, ID,
+    ISEQ_TRANSLATED, VALUE,
+};
 use crate::jit_state::JITState;
-use crate::options::*;
-use crate::stats::*;
+use crate::options::{get_option, OPTIONS};
+use crate::stats::{incr_counter, YjitExitLocations};
 use crate::utils::IntoUsize;
 use crate::yjit::yjit_enabled_p;
 

@@ -11,12 +11,12 @@ use std::slice;
 
 use crate::asm::{CodeBlock, OutlinedCb};
 use crate::backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP};
-use crate::call_info::{CallInfo};
+use crate::block::{Block, BlockId, BlockRef, BranchGenFn, BranchShape, Context, MAX_TEMP_TYPES};
+use crate::call_info::CallInfo;
 use crate::core::{
     free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump,
     get_or_create_iseq_payload, limit_block_versions, make_branch_entry, set_branch_target,
-    verify_blockid, Block, BlockId, BlockRef, BranchGenFn, BranchShape, Context, TempMapping, Type,
-    TypeDiff, YARVOpnd, MAX_TEMP_TYPES,
+    verify_blockid, TempMapping, Type, TypeDiff, YARVOpnd,
 };
 // Yes, this is a crazy number of things to import and I could hide it with
 // use crate::cruby::* but I want to be explicit about what we're using.
@@ -5610,7 +5610,14 @@ impl CodeGenerator {
                         .gen_send_iseq(iseq, frame_type, None, cme, block, call_info, argc, None);
                 }
                 VM_METHOD_TYPE_CFUNC => {
-                    return self.gen_send_cfunc(ci, cme, block, &comptime_recv_klass, call_info, argc);
+                    return self.gen_send_cfunc(
+                        ci,
+                        cme,
+                        block,
+                        &comptime_recv_klass,
+                        call_info,
+                        argc,
+                    );
                 }
                 VM_METHOD_TYPE_IVAR => {
                     if call_info.flags.is_splat() {
@@ -7133,7 +7140,8 @@ impl CodegenGlobals {
                 "Start of virtual address block should be page-aligned",
             );
 
-            use crate::virtualmem::*;
+            use crate::virtualmem::{SystemAllocator, VirtualMem};
+
             use std::ptr::NonNull;
 
             let mem_block = VirtualMem::new(

@@ -3,7 +3,7 @@
 #![allow(unused_imports)]
 
 use crate::asm::{imm_num_bits, uimm_num_bits, CodeBlock};
-use crate::core::{Context, TempMapping, Type};
+use crate::core::{TempMapping, Type};
 use crate::cruby::{SIZEOF_VALUE_I32, VALUE};
 use crate::options::*;
 use crate::virtualmem::CodePtr;
@@ -295,12 +295,6 @@ impl Target {
             Target::SideExitPtr(ptr) => *ptr,
             _ => unreachable!("trying to unwrap {:?} into code ptr", self),
         }
-    }
-}
-
-impl From<CodePtr> for Target {
-    fn from(code_ptr: CodePtr) -> Self {
-        Target::CodePtr(code_ptr)
     }
 }
 

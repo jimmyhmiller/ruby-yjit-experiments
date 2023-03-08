@@ -1,5 +1,6 @@
 mod asm;
 mod backend;
+mod block;
 mod call_info;
 mod codegen;
 mod core;
