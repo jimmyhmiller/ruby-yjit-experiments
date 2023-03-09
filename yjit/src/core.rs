@@ -12,7 +12,7 @@ use crate::{
     },
     dev::options::get_option,
     dev::stats::incr_counter,
-    invariants::block_assumptions_free,
+    meta::invariants::block_assumptions_free,
     meta::block::{
         BlockId, BlockRef, Branch, BranchGenFn, BranchRef, BranchShape, BranchStub, BranchTarget,
         IseqPayload, VersionList,

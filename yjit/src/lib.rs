@@ -4,7 +4,6 @@ mod codegen;
 mod core;
 mod cruby;
 mod dev;
-mod invariants;
 mod meta;
 mod utils;
 mod virtualmem;

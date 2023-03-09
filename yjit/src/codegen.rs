@@ -98,7 +98,7 @@ use crate::{
         incr_counter, ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack,
     },
     gen_counter_incr,
-    invariants::{
+    meta::invariants::{
         assume_method_basic_definition, assume_method_lookup_stable, assume_single_ractor_mode,
         assume_stable_constant_names, Invariants,
     },
