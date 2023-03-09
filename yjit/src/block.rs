@@ -1,4 +1,3 @@
-use crate::options::OPTIONS;
 use crate::{
     backend::ir::{Assembler, Opnd, Target, CFP, SP},
     codegen::CodePtr,

@@ -4,7 +4,7 @@
 use std::cmp;
 use std::collections::HashMap;
 use std::ffi::CStr;
-use std::mem::{self};
+use std::mem;
 use std::os::raw::{c_int, c_uint};
 use std::ptr;
 use std::slice;
@@ -97,10 +97,9 @@ use crate::invariants::{
     assume_stable_constant_names, Invariants,
 };
 use crate::jit_state::JITState;
-use crate::options::OPTIONS;
 use crate::options::{get_option, get_option_ref};
 use crate::stats::{
-    incr_counter, ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack, COUNTERS,
+    incr_counter, ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack,
 };
 use crate::utils::{iseq_get_location, print_str, IntoUsize};
 pub use crate::virtualmem::CodePtr;

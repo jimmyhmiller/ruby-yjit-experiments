@@ -27,7 +27,7 @@ use crate::cruby::{
 use crate::disasm::*;
 use crate::invariants::block_assumptions_free;
 use crate::jit_state::JITState;
-use crate::options::{get_option, OPTIONS};
+use crate::options::{get_option};
 use crate::stats::incr_counter;
 use crate::utils::{c_callable, IntoUsize};
 use crate::virtualmem::CodePtr;

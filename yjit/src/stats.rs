@@ -11,7 +11,7 @@ use crate::cruby::{
     rb_yjit_exit_locations_dict, rust_str_to_sym, size_t, src_loc, with_vm_lock, EcPtr, Qfalse,
     Qnil, Qtrue, VALUE, VM_INSTRUCTION_SIZE,
 };
-use crate::options::{get_option, OPTIONS};
+use crate::options::{get_option};
 use crate::yjit::yjit_enabled_p;
 
 // stats_alloc is a middleware to instrument global allocations in Rust.
@@ -178,7 +178,7 @@ pub(crate) use incr_counter;
 macro_rules! ptr_to_counter {
     ($counter_name:ident) => {
         unsafe {
-            let ctr_ptr = std::ptr::addr_of_mut!(COUNTERS.$counter_name);
+            let ctr_ptr = std::ptr::addr_of_mut!($crate::stats::COUNTERS.$counter_name);
             ctr_ptr
         }
     };
