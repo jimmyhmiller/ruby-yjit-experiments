@@ -3,15 +3,15 @@
 
 #![allow(dead_code)] // Counters are only used with the stats features
 
-use crate::block::Context;
 use crate::codegen::CodegenGlobals;
+use crate::context::Context;
 use crate::core::for_each_iseq_payload;
 use crate::cruby::{
     insn_name, rb_gc_mark, rb_hash_aset, rb_hash_new, rb_profile_frames, rb_vm_insn_addr2opcode,
     rb_yjit_exit_locations_dict, rust_str_to_sym, size_t, src_loc, with_vm_lock, EcPtr, Qfalse,
     Qnil, Qtrue, VALUE, VM_INSTRUCTION_SIZE,
 };
-use crate::options::{get_option};
+use crate::options::get_option;
 use crate::yjit::yjit_enabled_p;
 
 // stats_alloc is a middleware to instrument global allocations in Rust.

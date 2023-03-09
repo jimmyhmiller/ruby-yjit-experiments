@@ -1,344 +1,35 @@
-use crate::asm::*;
-use crate::backend::ir::{Assembler, Opnd, C_ARG_OPNDS, EC};
-use crate::block::BlockId;
-use crate::block::BlockRef;
-use crate::block::Branch;
-use crate::block::BranchGenFn;
-use crate::block::BranchRef;
-use crate::block::BranchShape;
-use crate::block::BranchStub;
-use crate::block::BranchTarget;
-use crate::block::Context;
-use crate::block::IseqPayload;
-use crate::block::VersionList;
-use crate::block::MAX_LOCAL_TYPES;
-use crate::codegen::{gen_entry_prologue, gen_single_block, CodeGenerator, CodegenGlobals};
-use crate::cruby::{
-    get_cfp_pc, get_cfp_sp, get_ec_cfp, get_iseq_encoded_size, imemo_iseq, obj_written,
-    rb_IMEMO_TYPE_P, rb_cArray, rb_cFalseClass, rb_cFloat, rb_cInteger, rb_cNilClass, rb_cString,
-    rb_cSymbol, rb_cTrueClass, rb_cfp_get_iseq, rb_gc_location, rb_gc_mark_movable,
-    rb_iseq_get_yjit_payload, rb_iseq_pc_at_idx, rb_iseq_reset_jit_func, rb_iseq_set_yjit_payload,
-    rb_jit_cont_each_iseq, rb_set_cfp_pc, rb_set_cfp_sp, rb_vm_barrier, rb_yjit_for_each_iseq,
-    rb_yjit_obj_written, ruby_value_type, src_loc, with_vm_lock, EcPtr, IseqPtr, Qfalse, Qnil,
-    Qtrue, RUBY_T_ARRAY, RUBY_T_FALSE, RUBY_T_FIXNUM, RUBY_T_FLOAT, RUBY_T_HASH, RUBY_T_NIL,
-    RUBY_T_STRING, RUBY_T_SYMBOL, RUBY_T_TRUE, VALUE,
+use crate::{
+    asm::{CodeBlock, OutlinedCb},
+    backend::ir::{Assembler, Opnd, C_ARG_OPNDS, EC},
+    block::{
+        BlockId, BlockRef, Branch, BranchGenFn, BranchRef, BranchShape, BranchStub, BranchTarget,
+        IseqPayload, VersionList,
+    },
+    codegen::{gen_entry_prologue, gen_single_block, CodeGenerator, CodegenGlobals},
+    context::{Context, TypeDiff},
+    cruby::{
+        get_cfp_pc, get_cfp_sp, get_ec_cfp, get_iseq_encoded_size, imemo_iseq, obj_written,
+        rb_IMEMO_TYPE_P, rb_cfp_get_iseq, rb_gc_location, rb_gc_mark_movable,
+        rb_iseq_get_yjit_payload, rb_iseq_pc_at_idx, rb_iseq_reset_jit_func,
+        rb_iseq_set_yjit_payload, rb_jit_cont_each_iseq, rb_set_cfp_pc, rb_set_cfp_sp,
+        rb_vm_barrier, rb_yjit_for_each_iseq, rb_yjit_obj_written, src_loc, with_vm_lock, EcPtr,
+        IseqPtr, VALUE,
+    },
+    invariants::block_assumptions_free,
+    jit_state::JITState,
+    options::get_option,
+    stats::incr_counter,
+    utils::{c_callable, IntoUsize},
+    virtualmem::CodePtr,
 };
-#[cfg(feature = "disasm")]
-use crate::disasm::*;
-use crate::invariants::block_assumptions_free;
-use crate::jit_state::JITState;
-use crate::options::{get_option};
-use crate::stats::incr_counter;
-use crate::utils::{c_callable, IntoUsize};
-use crate::virtualmem::CodePtr;
+
 use core::ffi::c_void;
 use std::cell::{RefCell, RefMut};
 use std::mem;
 use std::rc::Rc;
 
-// Represent the type of a value (local/stack/self) in YJIT
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Type {
-    Unknown,
-    UnknownImm,
-    UnknownHeap,
-    Nil,
-    True,
-    False,
-    Fixnum,
-    Flonum,
-    Hash,
-    ImmSymbol,
-
-    #[allow(unused)]
-    HeapSymbol,
-
-    TString, // An object with the T_STRING flag set, possibly an rb_cString
-    CString, // An un-subclassed string of type rb_cString (can have instance vars in some cases)
-    TArray,  // An object with the T_ARRAY flag set, possibly an rb_cArray
-    CArray,  // An un-subclassed string of type rb_cArray (can have instance vars in some cases)
-
-    BlockParamProxy, // A special sentinel value indicating the block parameter should be read from
-                     // the current surrounding cfp
-}
-
-// Default initialization
-impl Default for Type {
-    fn default() -> Self {
-        Type::Unknown
-    }
-}
-
-impl Type {
-    /// This returns an appropriate Type based on a known value
-    pub fn from(val: VALUE) -> Type {
-        if val.special_const_p() {
-            if val.fixnum_p() {
-                Type::Fixnum
-            } else if val.nil_p() {
-                Type::Nil
-            } else if val == Qtrue {
-                Type::True
-            } else if val == Qfalse {
-                Type::False
-            } else if val.static_sym_p() {
-                Type::ImmSymbol
-            } else if val.flonum_p() {
-                Type::Flonum
-            } else {
-                unreachable!("Illegal value: {:?}", val)
-            }
-        } else {
-            #[cfg(not(test))]
-            use crate::cruby::rb_block_param_proxy;
-            // Core.rs can't reference rb_cString because it's linked by Rust-only tests.
-            // But CString vs TString is only an optimisation and shouldn't affect correctness.
-            #[cfg(not(test))]
-            if val.class_of() == unsafe { rb_cString } {
-                return Type::CString;
-            }
-            #[cfg(not(test))]
-            if val.class_of() == unsafe { rb_cArray } {
-                return Type::CArray;
-            }
-            // We likewise can't reference rb_block_param_proxy, but it's again an optimisation;
-            // we can just treat it as a normal Object.
-            #[cfg(not(test))]
-            if val == unsafe { rb_block_param_proxy } {
-                return Type::BlockParamProxy;
-            }
-            match val.builtin_type() {
-                RUBY_T_ARRAY => Type::TArray,
-                RUBY_T_HASH => Type::Hash,
-                RUBY_T_STRING => Type::TString,
-                _ => Type::UnknownHeap,
-            }
-        }
-    }
-
-    /// Check if the type is an immediate
-    pub fn is_imm(&self) -> bool {
-        matches!(
-            self,
-            Type::UnknownImm
-                | Type::Nil
-                | Type::True
-                | Type::False
-                | Type::Fixnum
-                | Type::Flonum
-                | Type::ImmSymbol
-        )
-    }
-
-    /// Returns true when the type is not specific.
-    pub fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown | Type::UnknownImm | Type::UnknownHeap)
-    }
-
-    /// Returns true when we know the VALUE is a specific handle type,
-    /// such as a static symbol ([Type::ImmSymbol], i.e. true from RB_STATIC_SYM_P()).
-    /// Opposite of [Self::is_unknown].
-    pub fn is_specific(&self) -> bool {
-        !self.is_unknown()
-    }
-
-    /// Check if the type is a heap object
-    pub fn is_heap(&self) -> bool {
-        matches!(
-            self,
-            Type::UnknownHeap
-                | Type::TArray
-                | Type::CArray
-                | Type::Hash
-                | Type::HeapSymbol
-                | Type::TString
-                | Type::CString
-        )
-    }
-
-    /// Check if it's a T_ARRAY object (both TArray and CArray are T_ARRAY)
-    pub fn is_array(&self) -> bool {
-        matches!(self, Type::TArray | Type::CArray)
-    }
-
-    /// Returns an Option with the T_ value type if it is known, otherwise None
-    pub fn known_value_type(&self) -> Option<ruby_value_type> {
-        match self {
-            Type::Nil => Some(RUBY_T_NIL),
-            Type::True => Some(RUBY_T_TRUE),
-            Type::False => Some(RUBY_T_FALSE),
-            Type::Fixnum => Some(RUBY_T_FIXNUM),
-            Type::Flonum => Some(RUBY_T_FLOAT),
-            Type::TArray | Type::CArray => Some(RUBY_T_ARRAY),
-            Type::Hash => Some(RUBY_T_HASH),
-            Type::ImmSymbol | Type::HeapSymbol => Some(RUBY_T_SYMBOL),
-            Type::TString | Type::CString => Some(RUBY_T_STRING),
-            Type::Unknown | Type::UnknownImm | Type::UnknownHeap => None,
-            Type::BlockParamProxy => None,
-        }
-    }
-
-    /// Returns an Option with the class if it is known, otherwise None
-    pub fn known_class(&self) -> Option<VALUE> {
-        unsafe {
-            match self {
-                Type::Nil => Some(rb_cNilClass),
-                Type::True => Some(rb_cTrueClass),
-                Type::False => Some(rb_cFalseClass),
-                Type::Fixnum => Some(rb_cInteger),
-                Type::Flonum => Some(rb_cFloat),
-                Type::ImmSymbol | Type::HeapSymbol => Some(rb_cSymbol),
-                Type::CString => Some(rb_cString),
-                Type::CArray => Some(rb_cArray),
-                _ => None,
-            }
-        }
-    }
-
-    /// Returns an Option with the exact value if it is known, otherwise None
-    #[allow(unused)] // not yet used
-    pub fn known_exact_value(&self) -> Option<VALUE> {
-        match self {
-            Type::Nil => Some(Qnil),
-            Type::True => Some(Qtrue),
-            Type::False => Some(Qfalse),
-            _ => None,
-        }
-    }
-
-    /// Returns an Option boolean representing whether the value is truthy if known, otherwise None
-    pub fn known_truthy(&self) -> Option<bool> {
-        match self {
-            Type::Nil => Some(false),
-            Type::False => Some(false),
-            Type::UnknownHeap => Some(true),
-            Type::Unknown | Type::UnknownImm => None,
-            _ => Some(true),
-        }
-    }
-
-    /// Returns an Option boolean representing whether the value is equal to nil if known, otherwise None
-    pub fn known_nil(&self) -> Option<bool> {
-        match (self, self.known_truthy()) {
-            (Type::Nil, _) => Some(true),
-            (Type::False, _) => Some(false), // Qfalse is not nil
-            (_, Some(true)) => Some(false),  // if truthy, can't be nil
-            (_, _) => None,                  // otherwise unknown
-        }
-    }
-
-    /// Compute a difference between two value types
-    pub fn diff(self, dst: Self) -> TypeDiff {
-        // Perfect match, difference is zero
-        if self == dst {
-            return TypeDiff::Compatible(0);
-        }
-
-        // Any type can flow into an unknown type
-        if dst == Type::Unknown {
-            return TypeDiff::Compatible(1);
-        }
-
-        // A CString is also a TString.
-        if self == Type::CString && dst == Type::TString {
-            return TypeDiff::Compatible(1);
-        }
-
-        // A CArray is also a TArray.
-        if self == Type::CArray && dst == Type::TArray {
-            return TypeDiff::Compatible(1);
-        }
-
-        // Specific heap type into unknown heap type is imperfect but valid
-        if self.is_heap() && dst == Type::UnknownHeap {
-            return TypeDiff::Compatible(1);
-        }
-
-        // Specific immediate type into unknown immediate type is imperfect but valid
-        if self.is_imm() && dst == Type::UnknownImm {
-            return TypeDiff::Compatible(1);
-        }
-
-        // Incompatible types
-        TypeDiff::Incompatible
-    }
-
-    /// Upgrade this type into a more specific compatible type
-    /// The new type must be compatible and at least as specific as the previously known type.
-    pub fn upgrade(&mut self, src: Self) {
-        // Here we're checking that src is more specific than self
-        assert!(src.diff(*self) != TypeDiff::Incompatible);
-        *self = src;
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum TypeDiff {
-    // usize == 0: Same type
-    // usize >= 1: Different but compatible. The smaller, the more compatible.
-    Compatible(usize),
-    Incompatible,
-}
-
-// Potential mapping of a value on the temporary stack to
-// self, a local variable or constant so that we can track its type
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum TempMapping {
-    Stack,  // Normal stack value
-    ToSelf, // Temp maps to the self operand
-    Local(LocalIndex), // Temp maps to a local variable with index
-            //ConstMapping,         // Small constant (0, 1, 2, Qnil, Qfalse, Qtrue)
-}
-
-// Index used by MapToLocal. Using this instead of u8 makes TempMapping 1 byte.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum LocalIndex {
-    Local0,
-    Local1,
-    Local2,
-    Local3,
-    Local4,
-    Local5,
-    Local6,
-    Local7,
-}
-
-impl From<LocalIndex> for u8 {
-    fn from(idx: LocalIndex) -> Self {
-        match idx {
-            LocalIndex::Local0 => 0,
-            LocalIndex::Local1 => 1,
-            LocalIndex::Local2 => 2,
-            LocalIndex::Local3 => 3,
-            LocalIndex::Local4 => 4,
-            LocalIndex::Local5 => 5,
-            LocalIndex::Local6 => 6,
-            LocalIndex::Local7 => 7,
-        }
-    }
-}
-
-impl From<u8> for LocalIndex {
-    fn from(idx: u8) -> Self {
-        match idx {
-            0 => LocalIndex::Local0,
-            1 => LocalIndex::Local1,
-            2 => LocalIndex::Local2,
-            3 => LocalIndex::Local3,
-            4 => LocalIndex::Local4,
-            5 => LocalIndex::Local5,
-            6 => LocalIndex::Local6,
-            7 => LocalIndex::Local7,
-            _ => unreachable!("{idx} was larger than {MAX_LOCAL_TYPES}"),
-        }
-    }
-}
-
-impl Default for TempMapping {
-    fn default() -> Self {
-        TempMapping::Stack
-    }
-}
+#[cfg(feature = "disasm")]
+use crate::disasm::*;
 
 // Operand to a YARV bytecode instruction
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -1699,7 +1390,10 @@ pub fn delayed_deallocation(blockref: &BlockRef) {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::*;
+    use crate::{
+        context::Type,
+        core::{Context, TypeDiff, YARVOpnd},
+    };
 
     #[test]
     fn types() {

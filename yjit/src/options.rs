@@ -75,12 +75,10 @@ pub enum DumpDisasm {
 macro_rules! get_option {
     // Unsafe is ok here because options are initialized
     // once before any Ruby code executes
-    ($option_name:ident) => {
-        {
-            use crate::options::OPTIONS;
-            unsafe { OPTIONS.$option_name }
-        }
-    };
+    ($option_name:ident) => {{
+        use crate::options::OPTIONS;
+        unsafe { OPTIONS.$option_name }
+    }};
 }
 pub(crate) use get_option;
 

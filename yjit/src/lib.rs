@@ -3,6 +3,7 @@ mod backend;
 mod block;
 mod call_info;
 mod codegen;
+mod context;
 mod core;
 mod cruby;
 mod disasm;

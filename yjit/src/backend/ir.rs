@@ -3,7 +3,7 @@
 #![allow(unused_imports)]
 
 use crate::asm::{imm_num_bits, uimm_num_bits, CodeBlock};
-use crate::core::{TempMapping, Type};
+use crate::context::{TempMapping, Type};
 use crate::cruby::{SIZEOF_VALUE_I32, VALUE};
 use crate::options::*;
 use crate::virtualmem::CodePtr;

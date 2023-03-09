@@ -16,7 +16,7 @@ use crate::cruby::{
     ISEQ_TRANSLATED, VALUE,
 };
 use crate::jit_state::JITState;
-use crate::options::{get_option};
+use crate::options::get_option;
 use crate::stats::{incr_counter, YjitExitLocations};
 use crate::utils::IntoUsize;
 use crate::yjit::yjit_enabled_p;
