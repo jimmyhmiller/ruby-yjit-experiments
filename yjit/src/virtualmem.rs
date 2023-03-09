@@ -174,7 +174,7 @@ impl<A: Allocator> VirtualMemory<A> {
 
                 if alloc_size > page_size {
                     // This is unusual for the current setup, so keep track of it.
-                    crate::stats::incr_counter!(exec_mem_non_bump_alloc);
+                    crate::dev::stats::incr_counter!(exec_mem_non_bump_alloc);
                 }
 
                 // Allocate new chunk

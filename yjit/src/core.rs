@@ -1,12 +1,7 @@
 use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, C_ARG_OPNDS, EC},
-    block::{
-        BlockId, BlockRef, Branch, BranchGenFn, BranchRef, BranchShape, BranchStub, BranchTarget,
-        IseqPayload, VersionList,
-    },
     codegen::{gen_entry_prologue, gen_single_block, CodeGenerator, CodegenGlobals},
-    context::{Context, TypeDiff},
     cruby::{
         get_cfp_pc, get_cfp_sp, get_ec_cfp, get_iseq_encoded_size, imemo_iseq, obj_written,
         rb_IMEMO_TYPE_P, rb_cfp_get_iseq, rb_gc_location, rb_gc_mark_movable,
@@ -15,10 +10,15 @@ use crate::{
         rb_vm_barrier, rb_yjit_for_each_iseq, rb_yjit_obj_written, src_loc, with_vm_lock, EcPtr,
         IseqPtr, VALUE,
     },
+    dev::options::get_option,
+    dev::stats::incr_counter,
     invariants::block_assumptions_free,
-    jit_state::JITState,
-    options::get_option,
-    stats::incr_counter,
+    meta::block::{
+        BlockId, BlockRef, Branch, BranchGenFn, BranchRef, BranchShape, BranchStub, BranchTarget,
+        IseqPayload, VersionList,
+    },
+    meta::context::{Context, TypeDiff},
+    meta::jit_state::JITState,
     utils::{c_callable, IntoUsize},
     virtualmem::CodePtr,
 };
@@ -29,7 +29,7 @@ use std::mem;
 use std::rc::Rc;
 
 #[cfg(feature = "disasm")]
-use crate::disasm::*;
+use crate::dev::disasm::disasm_iseq_insn_range;
 
 // Operand to a YARV bytecode instruction
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -586,7 +586,7 @@ pub fn gen_block_series_body(
 
     #[cfg(feature = "disasm")]
     {
-        use crate::options::get_option_ref;
+        use crate::dev::options::get_option_ref;
         use crate::utils::iseq_get_location;
         // If dump_iseq_disasm is active, see if this iseq's location matches the given substring.
         // If so, we print the new blocks to the console.
@@ -1206,7 +1206,7 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
 
     #[cfg(feature = "disasm")]
     {
-        use crate::options::get_option_ref;
+        use crate::dev::options::get_option_ref;
         use crate::utils::iseq_get_location;
         // If dump_iseq_disasm is specified, print to console that blocks for matching ISEQ names were invalidated.
         if let Some(substr) = get_option_ref!(dump_iseq_disasm).as_ref() {
@@ -1391,7 +1391,7 @@ pub fn delayed_deallocation(blockref: &BlockRef) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        context::Type,
+        meta::context::Type,
         core::{Context, TypeDiff, YARVOpnd},
     };
 

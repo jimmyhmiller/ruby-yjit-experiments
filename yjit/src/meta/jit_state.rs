@@ -5,9 +5,9 @@ use crate::cruby::{
     get_iseq_body_local_table_size,
 };
 use crate::{
-    block::{BlockRef, BranchRef, CmePtr},
+    meta::block::{BlockRef, BranchRef, CmePtr},
     codegen::CodePtr,
-    context::Context,
+    meta::context::Context,
     cruby::{insn_len, EcPtr, IseqPtr, VALUE, VM_ENV_DATA_INDEX_SPECVAL, VM_ENV_DATA_SIZE},
 };
 

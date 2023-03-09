@@ -2,11 +2,12 @@
 use crate::backend::arm64::JMP_PTR_BYTES;
 #[cfg(target_arch = "x86_64")]
 use crate::backend::x86_64::JMP_PTR_BYTES;
-use crate::block::IseqPayload;
-use crate::core::for_each_off_stack_iseq_payload;
-use crate::core::for_each_on_stack_iseq_payload;
-use crate::invariants::rb_yjit_tracing_invalidate_all;
-use crate::virtualmem::WriteError;
+use crate::{
+    core::{for_each_off_stack_iseq_payload, for_each_on_stack_iseq_payload},
+    invariants::rb_yjit_tracing_invalidate_all,
+    meta::block::IseqPayload,
+    virtualmem::WriteError,
+};
 use std::cell::RefCell;
 use std::fmt;
 use std::mem;

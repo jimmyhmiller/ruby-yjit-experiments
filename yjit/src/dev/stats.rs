@@ -3,16 +3,18 @@
 
 #![allow(dead_code)] // Counters are only used with the stats features
 
-use crate::codegen::CodegenGlobals;
-use crate::context::Context;
-use crate::core::for_each_iseq_payload;
-use crate::cruby::{
-    insn_name, rb_gc_mark, rb_hash_aset, rb_hash_new, rb_profile_frames, rb_vm_insn_addr2opcode,
-    rb_yjit_exit_locations_dict, rust_str_to_sym, size_t, src_loc, with_vm_lock, EcPtr, Qfalse,
-    Qnil, Qtrue, VALUE, VM_INSTRUCTION_SIZE,
+use crate::{
+    codegen::CodegenGlobals,
+    core::for_each_iseq_payload,
+    cruby::{
+        insn_name, rb_gc_mark, rb_hash_aset, rb_hash_new, rb_profile_frames,
+        rb_vm_insn_addr2opcode, rb_yjit_exit_locations_dict, rust_str_to_sym, size_t, src_loc,
+        with_vm_lock, EcPtr, Qfalse, Qnil, Qtrue, VALUE, VM_INSTRUCTION_SIZE,
+    },
+    dev::options::get_option,
+    meta::context::Context,
+    yjit::yjit_enabled_p,
 };
-use crate::options::get_option;
-use crate::yjit::yjit_enabled_p;
 
 // stats_alloc is a middleware to instrument global allocations in Rust.
 #[cfg(feature = "stats")]
@@ -155,7 +157,7 @@ macro_rules! incr_counter_by {
     ($counter_name:ident, $count:expr) => {
         #[allow(unused_unsafe)]
         {
-            unsafe { $crate::stats::COUNTERS.$counter_name += $count as u64 }
+            unsafe { $crate::dev::stats::COUNTERS.$counter_name += $count as u64 }
         }
     };
 }
@@ -168,7 +170,7 @@ macro_rules! incr_counter {
     ($counter_name:ident) => {
         #[allow(unused_unsafe)]
         {
-            unsafe { $crate::stats::COUNTERS.$counter_name += 1 }
+            unsafe { $crate::dev::stats::COUNTERS.$counter_name += 1 }
         }
     };
 }
@@ -178,7 +180,7 @@ pub(crate) use incr_counter;
 macro_rules! ptr_to_counter {
     ($counter_name:ident) => {
         unsafe {
-            let ctr_ptr = std::ptr::addr_of_mut!($crate::stats::COUNTERS.$counter_name);
+            let ctr_ptr = std::ptr::addr_of_mut!($crate::dev::stats::COUNTERS.$counter_name);
             ctr_ptr
         }
     };

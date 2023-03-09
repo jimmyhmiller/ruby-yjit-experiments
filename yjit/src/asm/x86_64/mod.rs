@@ -687,7 +687,7 @@ pub fn call_rel32(cb: &mut CodeBlock, rel32: i32) {
 /// call - Call a pointer, encode with a 32-bit offset if possible
 pub fn call_ptr(cb: &mut CodeBlock, scratch_opnd: X86Opnd, dst_ptr: *const u8) {
     if let X86Opnd::Reg(_scratch_reg) = scratch_opnd {
-        use crate::stats::{incr_counter};
+        use crate::dev::stats::{incr_counter};
 
         // Pointer to the end of this call instruction
         let end_ptr = cb.get_ptr(cb.write_pos + 5);

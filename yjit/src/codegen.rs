@@ -13,9 +13,6 @@ pub use crate::virtualmem::CodePtr;
 use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP},
-    block::{Block, BlockId, BlockRef, BranchGenFn, BranchShape},
-    call_info::CallInfo,
-    context::{Context, TempMapping, Type, TypeDiff, MAX_TEMP_TYPES},
     core::{
         free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump,
         get_or_create_iseq_payload, limit_block_versions, make_branch_entry, set_branch_target,
@@ -96,14 +93,19 @@ use crate::{
         VM_METHOD_TYPE_OPTIMIZED, VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF,
         VM_METHOD_TYPE_ZSUPER, VM_SPECIAL_OBJECT_VMCORE,
     },
+    dev::options::{get_option, get_option_ref},
+    dev::stats::{
+        incr_counter, ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack,
+    },
     gen_counter_incr,
     invariants::{
         assume_method_basic_definition, assume_method_lookup_stable, assume_single_ractor_mode,
         assume_stable_constant_names, Invariants,
     },
-    jit_state::JITState,
-    options::{get_option, get_option_ref},
-    stats::{incr_counter, ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack},
+    meta::block::{Block, BlockId, BlockRef, BranchGenFn, BranchShape},
+    meta::call_info::CallInfo,
+    meta::context::{Context, TempMapping, Type, TypeDiff, MAX_TEMP_TYPES},
+    meta::jit_state::JITState,
     utils::{iseq_get_location, print_str, IntoUsize},
 };
 

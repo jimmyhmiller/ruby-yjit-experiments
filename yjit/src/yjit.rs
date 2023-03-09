@@ -1,10 +1,11 @@
-use crate::codegen::*;
-use crate::core::*;
-use crate::cruby::*;
-use crate::invariants::*;
-use crate::options::*;
-use crate::stats::incr_counter;
-use crate::stats::YjitExitLocations;
+use crate::{
+    codegen::CodegenGlobals,
+    core::gen_entry_point,
+    cruby::{EcPtr, IseqPtr, Qnil, VALUE, get_iseq_encoded_size, rb_bug, rb_get_iseq_body_stack_max},
+    invariants::Invariants,
+    dev::options::{get_option, parse_option},
+    dev::stats::{incr_counter, YjitExitLocations},
+};
 
 use std::os::raw;
 use std::sync::atomic::{AtomicBool, Ordering};

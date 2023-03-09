@@ -76,7 +76,7 @@ macro_rules! get_option {
     // Unsafe is ok here because options are initialized
     // once before any Ruby code executes
     ($option_name:ident) => {{
-        use crate::options::OPTIONS;
+        use crate::dev::options::OPTIONS;
         unsafe { OPTIONS.$option_name }
     }};
 }
@@ -87,7 +87,7 @@ macro_rules! get_option_ref {
     // Unsafe is ok here because options are initialized
     // once before any Ruby code executes
     ($option_name:ident) => {
-        unsafe { &($crate::options::OPTIONS.$option_name) }
+        unsafe { &($crate::dev::options::OPTIONS.$option_name) }
     };
 }
 pub(crate) use get_option_ref;

@@ -2,11 +2,13 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
-use crate::asm::{imm_num_bits, uimm_num_bits, CodeBlock};
-use crate::context::{TempMapping, Type};
-use crate::cruby::{SIZEOF_VALUE_I32, VALUE};
-use crate::options::*;
-use crate::virtualmem::CodePtr;
+use crate::{
+    asm::{imm_num_bits, uimm_num_bits, CodeBlock},
+    meta::context::{TempMapping, Type},
+    cruby::{SIZEOF_VALUE_I32, VALUE},
+    dev::options::*,
+    virtualmem::CodePtr,
+};
 use std::cell::Cell;
 use std::convert::From;
 use std::fmt;
@@ -1453,7 +1455,7 @@ impl Assembler {
 
         #[cfg(feature = "disasm")]
         if let Some(dump_disasm) = get_option_ref!(dump_disasm) {
-            use crate::disasm::dump_disasm_addr_range;
+            use crate::dev::disasm::dump_disasm_addr_range;
             let end_addr = cb.get_write_ptr();
             dump_disasm_addr_range(cb, start_addr, end_addr, dump_disasm)
         }

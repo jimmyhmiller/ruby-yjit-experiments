@@ -5,7 +5,7 @@ use crate::codegen::CodePtr;
 use crate::core::*;
 use crate::cruby::*;
 #[cfg(feature = "disasm")]
-use crate::options::DumpDisasm;
+use crate::dev::options::DumpDisasm;
 use crate::yjit::yjit_enabled_p;
 
 #[cfg(feature = "disasm")]
