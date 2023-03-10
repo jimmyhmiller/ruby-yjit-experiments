@@ -4,9 +4,9 @@
 
 use crate::{
     asm::{imm_num_bits, uimm_num_bits, CodeBlock},
-    meta::context::{TempMapping, Type},
     cruby::{SIZEOF_VALUE_I32, VALUE},
     dev::options::*,
+    meta::context::{TempMapping, Type},
     virtualmem::CodePtr,
 };
 use std::cell::Cell;

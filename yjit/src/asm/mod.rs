@@ -4,8 +4,8 @@ use crate::backend::arm64::JMP_PTR_BYTES;
 use crate::backend::x86_64::JMP_PTR_BYTES;
 use crate::{
     core::{for_each_off_stack_iseq_payload, for_each_on_stack_iseq_payload},
-    meta::invariants::rb_yjit_tracing_invalidate_all,
     meta::block::IseqPayload,
+    meta::invariants::rb_yjit_tracing_invalidate_all,
     virtualmem::WriteError,
 };
 use std::cell::RefCell;

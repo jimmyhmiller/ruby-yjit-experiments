@@ -12,8 +12,8 @@ use crate::{
         with_vm_lock, EcPtr, Qfalse, Qnil, Qtrue, VALUE, VM_INSTRUCTION_SIZE,
     },
     dev::options::get_option,
+    ffi::yjit_enabled_p,
     meta::context::Context,
-    yjit::yjit_enabled_p,
 };
 
 // stats_alloc is a middleware to instrument global allocations in Rust.

@@ -9,14 +9,14 @@ use std::os::raw::{c_int, c_uint};
 use std::ptr;
 use std::slice;
 
+use crate::bbv::limit_block_versions;
 pub use crate::virtualmem::CodePtr;
 use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP},
     core::{
         free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump,
-        get_or_create_iseq_payload, limit_block_versions, make_branch_entry, set_branch_target,
-        verify_blockid, YARVOpnd,
+        get_or_create_iseq_payload, make_branch_entry, set_branch_target, verify_blockid, YARVOpnd,
     },
     counted_exit,
     // Intentionally expanding all of these so we can see all the stuff we depend on.
@@ -98,13 +98,13 @@ use crate::{
         incr_counter, ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack,
     },
     gen_counter_incr,
+    meta::block::{Block, BlockId, BlockRef, BranchGenFn, BranchShape},
+    meta::call_info::CallInfo,
+    meta::context::{Context, TempMapping, Type, TypeDiff, MAX_TEMP_TYPES},
     meta::invariants::{
         assume_method_basic_definition, assume_method_lookup_stable, assume_single_ractor_mode,
         assume_stable_constant_names, Invariants,
     },
-    meta::block::{Block, BlockId, BlockRef, BranchGenFn, BranchShape},
-    meta::call_info::CallInfo,
-    meta::context::{Context, TempMapping, Type, TypeDiff, MAX_TEMP_TYPES},
     meta::jit_state::JITState,
     utils::{iseq_get_location, print_str, IntoUsize},
 };

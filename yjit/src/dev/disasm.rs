@@ -1,12 +1,12 @@
 #[cfg(feature = "disasm")]
 use crate::asm::CodeBlock;
+use crate::bbv::get_or_create_iseq_block_list;
 #[cfg(feature = "disasm")]
 use crate::codegen::CodePtr;
-use crate::core::*;
 use crate::cruby::*;
 #[cfg(feature = "disasm")]
 use crate::dev::options::DumpDisasm;
-use crate::yjit::yjit_enabled_p;
+use crate::ffi::yjit_enabled_p;
 
 #[cfg(feature = "disasm")]
 use std::fmt::Write;

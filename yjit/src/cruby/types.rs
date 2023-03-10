@@ -606,6 +606,7 @@ pub(crate) use src_loc;
 /// graph from `old` to `young`.
 macro_rules! obj_written {
     ($old: expr, $young: expr) => {
+        use crate::cruby::rb_yjit_obj_written;
         let (old, young): (VALUE, VALUE) = ($old, $young);
         let src_loc = $crate::cruby::src_loc!();
         unsafe { rb_yjit_obj_written(old, young, src_loc.file.as_ptr(), src_loc.line) };

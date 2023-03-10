@@ -7,8 +7,8 @@ use crate::{
         RUBY_T_FIXNUM, RUBY_T_FLOAT, RUBY_T_HASH, RUBY_T_NIL, RUBY_T_STRING, RUBY_T_SYMBOL,
         RUBY_T_TRUE, SIZEOF_VALUE, VALUE,
     },
-    meta::jit_state::JITState,
     dev::options::get_option,
+    meta::jit_state::JITState,
 };
 
 // Maximum number of temp value types we keep track of

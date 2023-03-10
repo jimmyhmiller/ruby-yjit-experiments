@@ -1,10 +1,11 @@
 mod asm;
 mod backend;
+mod bbv;
 mod codegen;
 mod core;
 mod cruby;
 mod dev;
+mod ffi;
 mod meta;
 mod utils;
 mod virtualmem;
-mod yjit;

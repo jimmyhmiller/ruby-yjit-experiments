@@ -2,11 +2,11 @@
 //! generated code if and when these assumptions are invalidated.
 
 use crate::{
-    meta::block::{BlockId, BlockRef},
+    bbv::take_version_list,
     codegen::{CodeGenerator, CodegenGlobals},
     core::{
         delayed_deallocation, for_each_iseq, for_each_on_stack_iseq, free_block, get_iseq_payload,
-        invalidate_block_version, take_version_list,
+        invalidate_block_version,
     },
     cruby::{
         get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL, rb_callable_method_entry,
@@ -15,11 +15,12 @@ use crate::{
         ruby_basic_operators, src_loc, with_vm_lock, RedefinitionFlag,
         YARVINSN_opt_getconstant_path, FL_TEST, IC, ID, ISEQ_TRANSLATED, VALUE,
     },
-    meta::jit_state::JITState,
     dev::options::get_option,
     dev::stats::{incr_counter, YjitExitLocations},
+    ffi::yjit_enabled_p,
+    meta::block::{BlockId, BlockRef},
+    meta::jit_state::JITState,
     utils::IntoUsize,
-    yjit::yjit_enabled_p,
 };
 
 use std::collections::{HashMap, HashSet};
