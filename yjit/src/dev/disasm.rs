@@ -45,13 +45,15 @@ pub extern "C" fn rb_yjit_disasm_iseq(_ec: EcPtr, _ruby_self: VALUE, iseqw: VALU
 
 #[cfg(feature = "disasm")]
 pub fn disasm_iseq_insn_range(iseq: IseqPtr, start_idx: u32, end_idx: u32) -> String {
+    use crate::codegen::globals::CodegenGlobals;
+
     let mut out = String::from("");
 
     // Get a list of block versions generated for this iseq
     let mut block_list = get_or_create_iseq_block_list(iseq);
 
     // Get a list of codeblocks relevant to this iseq
-    let global_cb = crate::codegen::CodegenGlobals::get_inline_cb();
+    let global_cb = CodegenGlobals::get_inline_cb();
 
     // Sort the blocks by increasing start addresses
     block_list.sort_by(|a, b| {

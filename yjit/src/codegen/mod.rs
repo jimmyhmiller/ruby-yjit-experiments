@@ -1,8 +1,6 @@
 // We use the YARV bytecode constants which have a CRuby-style name
 #![allow(non_upper_case_globals)]
 
-use std::collections::HashMap;
-use std::mem;
 use std::os::raw::{c_int, c_uint};
 use std::ptr;
 use std::slice;
@@ -15,8 +13,8 @@ use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP},
     core::{
-        free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump, make_branch_entry,
-        set_branch_target, verify_blockid,
+        free_block, gen_branch, gen_direct_jump, make_branch_entry, set_branch_target,
+        verify_blockid,
     },
     counted_exit,
     // Intentionally expanding all of these so we can see all the stuff we depend on.
@@ -35,38 +33,37 @@ use crate::{
         idRespond_to_missing, imemo_callinfo, insn_len, insn_name, iseq_inline_constant_cache,
         rb_IMEMO_TYPE_P, rb_aliased_callable_method_entry, rb_ary_clear, rb_ary_entry_internal,
         rb_ary_resurrect, rb_ary_store, rb_ary_tmp_new_from_values, rb_backref_get,
-        rb_block_param_proxy, rb_builtin_function, rb_cArray, rb_cBasicObject, rb_cFalseClass,
-        rb_cFloat, rb_cHash, rb_cInteger, rb_cModule, rb_cNilClass, rb_cString, rb_cSymbol,
-        rb_cThread, rb_cTrueClass, rb_c_method_tracing_currently_enabled, rb_call_data,
-        rb_callable_method_entry, rb_callable_method_entry_or_negative, rb_callable_method_entry_t,
-        rb_callinfo, rb_captured_block, rb_class_allocate_instance, rb_class_attached_object,
+        rb_block_param_proxy, rb_builtin_function, rb_cArray, rb_cFalseClass, rb_cFloat, rb_cHash,
+        rb_cInteger, rb_cNilClass, rb_cString, rb_cSymbol, rb_cTrueClass,
+        rb_c_method_tracing_currently_enabled, rb_call_data, rb_callable_method_entry,
+        rb_callable_method_entry_or_negative, rb_callable_method_entry_t, rb_callinfo,
+        rb_captured_block, rb_class_allocate_instance, rb_class_attached_object,
         rb_class_get_superclass, rb_ec_ary_new_from_values, rb_ec_str_resurrect,
         rb_ensure_iv_list_size, rb_execution_context_struct, rb_fix_mod_fix, rb_full_cfunc_return,
         rb_gc_writebarrier, rb_get_alloc_func, rb_get_def_bmethod_proc,
         rb_get_iseq_body_local_iseq, rb_get_iseq_body_param_lead_num, rb_get_iseq_body_parent_iseq,
         rb_get_symbol_id, rb_gvar_get, rb_gvar_set, rb_hash_aref, rb_hash_aset,
         rb_hash_bulk_insert, rb_hash_new, rb_hash_new_with_size, rb_hash_resurrect,
-        rb_hash_stlike_foreach, rb_hash_stlike_lookup, rb_intern, rb_iseq_opcode_at_pc,
-        rb_iseq_pc_at_idx, rb_iseq_t, rb_ivar_get, rb_leaf_builtin_function, rb_mKernel,
-        rb_mRubyVMFrozenCore, rb_method_definition_t, rb_method_entry_at, rb_obj_as_string_result,
-        rb_obj_class, rb_obj_is_kind_of, rb_optimized_call, rb_range_new, rb_reg_last_match,
-        rb_reg_match_last, rb_reg_match_post, rb_reg_match_pre, rb_reg_new_ary, rb_reg_nth_match,
-        rb_shape_get_iv_index, rb_shape_get_next, rb_shape_get_shape_by_id, rb_shape_get_shape_id,
-        rb_shape_id, rb_shape_id_offset, rb_shape_transition_shape_capa, rb_singleton_class,
-        rb_str_buf_append, rb_str_bytesize, rb_str_concat_literals, rb_str_dup,
-        rb_str_eql_internal, rb_str_intern, rb_str_neq_internal, rb_sym2id, rb_vm_bh_to_procval,
-        rb_vm_concat_array, rb_vm_defined, rb_vm_ep_local_ep, rb_vm_frame_method_entry,
-        rb_vm_getclassvariable, rb_vm_ic_hit_p, rb_vm_set_ivar_id, rb_vm_setclassvariable,
-        rb_vm_setinstancevariable, rb_vm_splat_array, rb_yjit_array_len, rb_yjit_get_proc_ptr,
-        rb_yjit_str_simple_append, ruby_basic_operators, st_data_t, vm_ci_argc, vm_ci_kwarg,
-        vm_ci_mid, EcPtr, IseqPtr, Qfalse, Qnil, Qtrue, Qundef, RBasic, RedefinitionFlag,
-        YARVINSN_opt_getconstant_path, YARVINSN_putobject_INT2FIX_0_, ARRAY_REDEFINED_OP_FLAG,
-        BASIC_OP_UNREDEFINED_P, BOP_AND, BOP_AREF, BOP_EQ, BOP_EQQ, BOP_FREEZE, BOP_GE, BOP_GT,
-        BOP_LE, BOP_LT, BOP_MINUS, BOP_MOD, BOP_OR, BOP_PLUS, BOP_UMINUS, FL_TEST, FL_TEST_RAW,
-        HASH_REDEFINED_OP_FLAG, ID, INTEGER_REDEFINED_OP_FLAG, METHOD_ENTRY_VISI,
-        METHOD_VISI_PRIVATE, METHOD_VISI_PROTECTED, METHOD_VISI_PUBLIC, METHOD_VISI_UNDEF,
-        OBJ_TOO_COMPLEX_SHAPE_ID, OPTIMIZED_METHOD_TYPE_BLOCK_CALL, OPTIMIZED_METHOD_TYPE_CALL,
-        OPTIMIZED_METHOD_TYPE_SEND, OPTIMIZED_METHOD_TYPE_STRUCT_AREF,
+        rb_hash_stlike_foreach, rb_hash_stlike_lookup, rb_iseq_opcode_at_pc, rb_iseq_pc_at_idx,
+        rb_iseq_t, rb_ivar_get, rb_leaf_builtin_function, rb_mRubyVMFrozenCore,
+        rb_method_definition_t, rb_obj_as_string_result, rb_obj_class, rb_obj_is_kind_of,
+        rb_optimized_call, rb_range_new, rb_reg_last_match, rb_reg_match_last, rb_reg_match_post,
+        rb_reg_match_pre, rb_reg_new_ary, rb_reg_nth_match, rb_shape_get_iv_index,
+        rb_shape_get_next, rb_shape_get_shape_by_id, rb_shape_get_shape_id, rb_shape_id,
+        rb_shape_id_offset, rb_shape_transition_shape_capa, rb_str_buf_append, rb_str_bytesize,
+        rb_str_concat_literals, rb_str_dup, rb_str_eql_internal, rb_str_intern,
+        rb_str_neq_internal, rb_sym2id, rb_vm_bh_to_procval, rb_vm_concat_array, rb_vm_defined,
+        rb_vm_ep_local_ep, rb_vm_frame_method_entry, rb_vm_getclassvariable, rb_vm_ic_hit_p,
+        rb_vm_set_ivar_id, rb_vm_setclassvariable, rb_vm_setinstancevariable, rb_vm_splat_array,
+        rb_yjit_array_len, rb_yjit_get_proc_ptr, rb_yjit_str_simple_append, ruby_basic_operators,
+        st_data_t, vm_ci_argc, vm_ci_kwarg, vm_ci_mid, EcPtr, IseqPtr, Qfalse, Qnil, Qtrue, Qundef,
+        RBasic, RedefinitionFlag, YARVINSN_opt_getconstant_path, YARVINSN_putobject_INT2FIX_0_,
+        ARRAY_REDEFINED_OP_FLAG, BASIC_OP_UNREDEFINED_P, BOP_AND, BOP_AREF, BOP_EQ, BOP_EQQ,
+        BOP_FREEZE, BOP_GE, BOP_GT, BOP_LE, BOP_LT, BOP_MINUS, BOP_MOD, BOP_OR, BOP_PLUS,
+        BOP_UMINUS, FL_TEST, FL_TEST_RAW, HASH_REDEFINED_OP_FLAG, ID, INTEGER_REDEFINED_OP_FLAG,
+        METHOD_ENTRY_VISI, METHOD_VISI_PRIVATE, METHOD_VISI_PROTECTED, METHOD_VISI_PUBLIC,
+        METHOD_VISI_UNDEF, OBJ_TOO_COMPLEX_SHAPE_ID, OPTIMIZED_METHOD_TYPE_BLOCK_CALL,
+        OPTIMIZED_METHOD_TYPE_CALL, OPTIMIZED_METHOD_TYPE_SEND, OPTIMIZED_METHOD_TYPE_STRUCT_AREF,
         OPTIMIZED_METHOD_TYPE_STRUCT_ASET, RARRAY_EMBED_FLAG, RARRAY_EMBED_LEN_MASK,
         RARRAY_EMBED_LEN_SHIFT, RB_TYPE_P, RCLASS_ORIGIN, RHASH_PASS_AS_KEYWORDS,
         RMODULE_IS_REFINEMENT, ROBJECT_EMBED, ROBJECT_OFFSET_AS_ARY, ROBJECT_OFFSET_AS_HEAP_IVPTR,
@@ -108,6 +105,8 @@ use crate::{
     meta::jit_state::JITState,
     utils::{iseq_get_location, print_str, IntoUsize},
 };
+
+pub mod globals;
 
 /// Status returned by code generation functions
 #[derive(PartialEq, Debug)]
@@ -169,7 +168,7 @@ fn gen_save_sp(asm: &mut Assembler, ctx: &mut Context) {
 fn record_global_inval_patch(asm: &mut Assembler, outline_block_target_pos: CodePtr) {
     asm.pad_inval_patch();
     asm.pos_marker(move |code_ptr| {
-        CodegenGlobals::push_global_inval_patch(code_ptr, outline_block_target_pos);
+        globals::CodegenGlobals::push_global_inval_patch(code_ptr, outline_block_target_pos);
     });
 }
 
@@ -378,7 +377,7 @@ pub fn gen_entry_prologue(cb: &mut CodeBlock, iseq: IseqPtr, insn_idx: u32) -> O
     // Setup cfp->jit_return
     asm.mov(
         Opnd::mem(64, CFP, RUBY_OFFSET_CFP_JIT_RETURN),
-        Opnd::const_ptr(CodegenGlobals::get_leave_exit_code().raw_ptr()),
+        Opnd::const_ptr(globals::CodegenGlobals::get_leave_exit_code().raw_ptr()),
     );
 
     // We're compiling iseqs that we *expect* to start at `insn_idx`. But in
@@ -629,7 +628,7 @@ impl CodeGenerator {
     }
 
     pub fn get_ocb(&mut self) -> &mut OutlinedCb {
-        CodegenGlobals::get_outlined_cb()
+        globals::CodegenGlobals::get_outlined_cb()
     }
 
     /// A public function that can be called from within the code generation
@@ -4390,7 +4389,7 @@ impl CodeGenerator {
         // Record code position for TracePoint patching. See full_cfunc_return().
         record_global_inval_patch(
             &mut self.asm,
-            CodegenGlobals::get_outline_full_cfunc_return_pos(),
+            globals::CodegenGlobals::get_outline_full_cfunc_return_pos(),
         );
 
         // Push the return value on the Ruby stack
@@ -6901,10 +6900,10 @@ fn get_gen_fn(opcode: VALUE) -> Option<InsnGenFn> {
 }
 
 // Check if we know how to codegen for a particular cfunc method
-fn lookup_cfunc_codegen(def: *const rb_method_definition_t) -> Option<MethodGenFn> {
+fn lookup_cfunc_codegen(def: *const rb_method_definition_t) -> Option<globals::MethodGenFn> {
     let method_serial = unsafe { get_def_method_serial(def) };
 
-    CodegenGlobals::look_up_codegen_method(method_serial)
+    globals::CodegenGlobals::look_up_codegen_method(method_serial)
 }
 
 // Is anyone listening for :c_call and :c_return event currently?
@@ -6975,305 +6974,12 @@ pub const CASE_WHEN_MAX_DEPTH: i32 = 20;
 // Conditional move operation used by comparison operators
 type CmovFn = fn(cb: &mut Assembler, opnd0: Opnd, opnd1: Opnd) -> Opnd;
 
-// Return true when the codegen function generates code.
-// known_recv_klass is non-NULL when the caller has used jit_guard_known_klass().
-// See yjit_reg_method().
-type MethodGenFn = fn(
-    code_generator: &mut CodeGenerator,
-    ci: *const rb_callinfo,
-    cme: *const rb_callable_method_entry_t,
-    block: Option<IseqPtr>,
-    argc: i32,
-    known_recv_class: *const VALUE,
-) -> bool;
-
-/// Global state needed for code generation
-pub struct CodegenGlobals {
-    /// Inline code block (fast path)
-    inline_cb: CodeBlock,
-
-    /// Outlined code block (slow path)
-    outlined_cb: OutlinedCb,
-
-    /// Code for exiting back to the interpreter from the leave instruction
-    leave_exit_code: CodePtr,
-
-    // For exiting from YJIT frame from branch_stub_hit().
-    // Filled by gen_code_for_exit_from_stub().
-    stub_exit_code: CodePtr,
-
-    // For servicing branch stubs
-    branch_stub_hit_trampoline: CodePtr,
-
-    // Code for full logic of returning from C method and exiting to the interpreter
-    outline_full_cfunc_return_pos: CodePtr,
-
-    /// For implementing global code invalidation
-    global_inval_patches: Vec<CodepagePatch>,
-
-    // Methods for generating code for hardcoded (usually C) methods
-    method_codegen_table: HashMap<usize, MethodGenFn>,
-
-    /// Page indexes for outlined code that are not associated to any ISEQ.
-    ocb_pages: Vec<usize>,
-
-    /// How many times code GC has been executed.
-    code_gc_count: usize,
-}
-
 /// For implementing global code invalidation. A position in the inline
 /// codeblock to patch into a JMP rel32 which jumps into some code in
 /// the outlined codeblock to exit to the interpreter.
 pub struct CodepagePatch {
     pub inline_patch_pos: CodePtr,
     pub outlined_target_pos: CodePtr,
-}
-
-/// Private singleton instance of the codegen globals
-static mut CODEGEN_GLOBALS: Option<CodegenGlobals> = None;
-
-impl CodegenGlobals {
-    /// Initialize the codegen globals
-    pub fn init() {
-        // Executable memory and code page size in bytes
-        let mem_size = get_option!(exec_mem_size);
-
-        #[cfg(not(test))]
-        let (mut cb, mut ocb) = {
-            use crate::cruby::{rb_yjit_get_page_size, rb_yjit_reserve_addr_space};
-            use std::cell::RefCell;
-            use std::rc::Rc;
-
-            let virt_block: *mut u8 = unsafe { rb_yjit_reserve_addr_space(mem_size as u32) };
-
-            // Memory protection syscalls need page-aligned addresses, so check it here. Assuming
-            // `virt_block` is page-aligned, `second_half` should be page-aligned as long as the
-            // page size in bytes is a power of two 2¹⁹ or smaller. This is because the user
-            // requested size is half of mem_option × 2²⁰ as it's in MiB.
-            //
-            // Basically, we don't support x86-64 2MiB and 1GiB pages. ARMv8 can do up to 64KiB
-            // (2¹⁶ bytes) pages, which should be fine. 4KiB pages seem to be the most popular though.
-            let page_size = unsafe { rb_yjit_get_page_size() };
-            assert_eq!(
-                virt_block as usize % page_size.into_usize(),
-                0,
-                "Start of virtual address block should be page-aligned",
-            );
-
-            use crate::virtualmem::{SystemAllocator, VirtualMem};
-
-            use std::ptr::NonNull;
-
-            let mem_block = VirtualMem::new(
-                SystemAllocator {},
-                page_size,
-                NonNull::new(virt_block).unwrap(),
-                mem_size,
-            );
-            let mem_block = Rc::new(RefCell::new(mem_block));
-
-            let freed_pages = Rc::new(None);
-            let cb = CodeBlock::new(mem_block.clone(), false, freed_pages.clone());
-            let ocb = OutlinedCb::wrap(CodeBlock::new(mem_block, true, freed_pages));
-
-            (cb, ocb)
-        };
-
-        // In test mode we're not linking with the C code
-        // so we don't allocate executable memory
-        #[cfg(test)]
-        let mut cb = CodeBlock::new_dummy(mem_size / 2);
-        #[cfg(test)]
-        let mut ocb = OutlinedCb::wrap(CodeBlock::new_dummy(mem_size / 2));
-
-        let ocb_start_addr = ocb.unwrap().get_write_ptr();
-        let leave_exit_code = gen_leave_exit(&mut ocb);
-
-        let stub_exit_code = gen_code_for_exit_from_stub(&mut ocb);
-
-        let branch_stub_hit_trampoline = gen_branch_stub_hit_trampoline(&mut ocb);
-
-        // Generate full exit code for C func
-        let cfunc_exit_code = gen_full_cfunc_return(&mut ocb);
-
-        let ocb_end_addr = ocb.unwrap().get_write_ptr();
-        let ocb_pages = ocb.unwrap().addrs_to_pages(ocb_start_addr, ocb_end_addr);
-
-        // Mark all code memory as executable
-        cb.mark_all_executable();
-        ocb.unwrap().mark_all_executable();
-
-        let mut codegen_globals = CodegenGlobals {
-            inline_cb: cb,
-            outlined_cb: ocb,
-            leave_exit_code,
-            stub_exit_code,
-            outline_full_cfunc_return_pos: cfunc_exit_code,
-            branch_stub_hit_trampoline,
-            global_inval_patches: Vec::new(),
-            method_codegen_table: HashMap::new(),
-            ocb_pages,
-            code_gc_count: 0,
-        };
-
-        // Register the method codegen functions
-        codegen_globals.reg_method_codegen_fns();
-
-        // Initialize the codegen globals instance
-        unsafe {
-            CODEGEN_GLOBALS = Some(codegen_globals);
-        }
-    }
-
-    // Register a specialized codegen function for a particular method. Note that
-    // the if the function returns true, the code it generates runs without a
-    // control frame and without interrupt checks. To avoid creating observable
-    // behavior changes, the codegen function should only target simple code paths
-    // that do not allocate and do not make method calls.
-    fn yjit_reg_method(&mut self, klass: VALUE, mid_str: &str, gen_fn: MethodGenFn) {
-        let id_string = std::ffi::CString::new(mid_str).expect("couldn't convert to CString!");
-        let mid = unsafe { rb_intern(id_string.as_ptr()) };
-        let me = unsafe { rb_method_entry_at(klass, mid) };
-
-        if me.is_null() {
-            panic!("undefined optimized method!");
-        }
-
-        // For now, only cfuncs are supported
-        //RUBY_ASSERT(me && me->def);
-        //RUBY_ASSERT(me->def->type == VM_METHOD_TYPE_CFUNC);
-
-        let method_serial = unsafe {
-            let def = (*me).def;
-            get_def_method_serial(def)
-        };
-
-        self.method_codegen_table.insert(method_serial, gen_fn);
-    }
-
-    /// Register codegen functions for some Ruby core methods
-    fn reg_method_codegen_fns(&mut self) {
-        unsafe {
-            // Specialization for C methods. See yjit_reg_method() for details.
-            self.yjit_reg_method(rb_cBasicObject, "!", CodeGenerator::jit_rb_obj_not);
-
-            self.yjit_reg_method(rb_cNilClass, "nil?", CodeGenerator::jit_rb_true);
-            self.yjit_reg_method(rb_mKernel, "nil?", CodeGenerator::jit_rb_false);
-            self.yjit_reg_method(rb_mKernel, "is_a?", CodeGenerator::jit_rb_kernel_is_a);
-            self.yjit_reg_method(rb_mKernel, "kind_of?", CodeGenerator::jit_rb_kernel_is_a);
-            self.yjit_reg_method(
-                rb_mKernel,
-                "instance_of?",
-                CodeGenerator::jit_rb_kernel_instance_of,
-            );
-
-            self.yjit_reg_method(rb_cBasicObject, "==", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cBasicObject, "equal?", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cBasicObject, "!=", CodeGenerator::jit_rb_obj_not_equal);
-            self.yjit_reg_method(rb_mKernel, "eql?", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cModule, "==", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cModule, "===", CodeGenerator::jit_rb_mod_eqq);
-            self.yjit_reg_method(rb_cSymbol, "==", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cSymbol, "===", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cInteger, "==", CodeGenerator::jit_rb_int_equal);
-            self.yjit_reg_method(rb_cInteger, "===", CodeGenerator::jit_rb_int_equal);
-
-            // rb_str_to_s() methods in string.c
-            self.yjit_reg_method(rb_cString, "empty?", CodeGenerator::jit_rb_str_empty_p);
-            self.yjit_reg_method(rb_cString, "to_s", CodeGenerator::jit_rb_str_to_s);
-            self.yjit_reg_method(rb_cString, "to_str", CodeGenerator::jit_rb_str_to_s);
-            self.yjit_reg_method(rb_cString, "bytesize", CodeGenerator::jit_rb_str_bytesize);
-            self.yjit_reg_method(rb_cString, "<<", CodeGenerator::jit_rb_str_concat);
-            self.yjit_reg_method(rb_cString, "+@", CodeGenerator::jit_rb_str_uplus);
-
-            // rb_ary_empty_p() method in array.c
-            self.yjit_reg_method(rb_cArray, "empty?", CodeGenerator::jit_rb_ary_empty_p);
-
-            self.yjit_reg_method(rb_mKernel, "respond_to?", CodeGenerator::jit_obj_respond_to);
-            self.yjit_reg_method(
-                rb_mKernel,
-                "block_given?",
-                CodeGenerator::jit_rb_f_block_given_p,
-            );
-
-            // Thread.current
-            self.yjit_reg_method(
-                rb_singleton_class(rb_cThread),
-                "current",
-                CodeGenerator::jit_thread_s_current,
-            );
-        }
-    }
-
-    /// Get a mutable reference to the codegen globals instance
-    pub fn get_instance() -> &'static mut CodegenGlobals {
-        unsafe { CODEGEN_GLOBALS.as_mut().unwrap() }
-    }
-
-    pub fn has_instance() -> bool {
-        unsafe { CODEGEN_GLOBALS.as_mut().is_some() }
-    }
-
-    /// Get a mutable reference to the inline code block
-    pub fn get_inline_cb() -> &'static mut CodeBlock {
-        &mut CodegenGlobals::get_instance().inline_cb
-    }
-
-    /// Get a mutable reference to the outlined code block
-    pub fn get_outlined_cb() -> &'static mut OutlinedCb {
-        &mut CodegenGlobals::get_instance().outlined_cb
-    }
-
-    pub fn get_leave_exit_code() -> CodePtr {
-        CodegenGlobals::get_instance().leave_exit_code
-    }
-
-    pub fn get_stub_exit_code() -> CodePtr {
-        CodegenGlobals::get_instance().stub_exit_code
-    }
-
-    pub fn push_global_inval_patch(i_pos: CodePtr, o_pos: CodePtr) {
-        let patch = CodepagePatch {
-            inline_patch_pos: i_pos,
-            outlined_target_pos: o_pos,
-        };
-        CodegenGlobals::get_instance()
-            .global_inval_patches
-            .push(patch);
-    }
-
-    // Drain the list of patches and return it
-    pub fn take_global_inval_patches() -> Vec<CodepagePatch> {
-        let globals = CodegenGlobals::get_instance();
-        mem::take(&mut globals.global_inval_patches)
-    }
-
-    pub fn get_outline_full_cfunc_return_pos() -> CodePtr {
-        CodegenGlobals::get_instance().outline_full_cfunc_return_pos
-    }
-
-    pub fn get_branch_stub_hit_trampoline() -> CodePtr {
-        CodegenGlobals::get_instance().branch_stub_hit_trampoline
-    }
-
-    pub fn look_up_codegen_method(method_serial: usize) -> Option<MethodGenFn> {
-        let table = &CodegenGlobals::get_instance().method_codegen_table;
-
-        let option_ref = table.get(&method_serial);
-        option_ref.copied()
-    }
-
-    pub fn get_ocb_pages() -> &'static Vec<usize> {
-        &CodegenGlobals::get_instance().ocb_pages
-    }
-
-    pub fn incr_code_gc_count() {
-        CodegenGlobals::get_instance().code_gc_count += 1;
-    }
-
-    pub fn get_code_gc_count() -> usize {
-        CodegenGlobals::get_instance().code_gc_count
-    }
 }
 
 // TODO: Uncomment these tests

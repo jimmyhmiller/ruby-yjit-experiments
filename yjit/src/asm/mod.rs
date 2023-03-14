@@ -15,7 +15,7 @@ use std::rc::Rc;
 #[cfg(feature = "disasm")]
 use std::collections::BTreeMap;
 
-use crate::codegen::CodegenGlobals;
+use crate::codegen::globals::CodegenGlobals;
 use crate::virtualmem::{CodePtr, VirtualMem};
 
 // Lots of manual vertical alignment in there that rustfmt doesn't handle well.

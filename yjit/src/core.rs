@@ -2,7 +2,7 @@ use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, C_ARG_OPNDS, EC},
     bbv::{add_block_version, find_block_version, remove_block_version},
-    codegen::{gen_entry_prologue, gen_single_block, CodeGenerator, CodegenGlobals},
+    codegen::{gen_entry_prologue, gen_single_block, globals::CodegenGlobals, CodeGenerator},
     cruby::{
         get_cfp_pc, get_cfp_sp, get_ec_cfp, get_iseq_encoded_size, imemo_iseq, rb_IMEMO_TYPE_P,
         rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_iseq_reset_jit_func, rb_set_cfp_pc, rb_set_cfp_sp,

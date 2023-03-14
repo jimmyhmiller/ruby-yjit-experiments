@@ -3,7 +3,7 @@
 
 use crate::{
     bbv::take_version_list,
-    codegen::{CodeGenerator, CodegenGlobals},
+    codegen::{globals::CodegenGlobals, CodeGenerator},
     core::{delayed_deallocation, free_block, invalidate_block_version},
     cruby::{
         get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL, rb_callable_method_entry,

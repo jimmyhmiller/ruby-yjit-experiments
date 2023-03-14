@@ -1,6 +1,6 @@
 use crate::{
     asm::CodeBlock,
-    codegen::CodegenGlobals,
+    codegen::globals::CodegenGlobals,
     core::{free_block, gen_entry_point},
     cruby::{
         get_iseq_encoded_size, rb_bug, rb_gc_location, rb_gc_mark_movable,
