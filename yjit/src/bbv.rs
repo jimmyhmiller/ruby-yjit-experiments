@@ -1,8 +1,8 @@
 use crate::{
     asm::CodeBlock,
-    core::{get_iseq_payload, get_or_create_iseq_payload},
     cruby::{obj_written, IseqPtr, VALUE},
     dev::{options::get_option, stats::incr_counter},
+    iseq::{get_iseq_payload, get_or_create_iseq_payload},
     meta::{
         block::{BlockId, BlockRef, VersionList},
         context::{Context, TypeDiff},

@@ -1,15 +1,35 @@
+use std::{cmp, ffi::CStr};
+
 use crate::{
     backend::ir::{Opnd, SP},
-    core::YARVOpnd,
     cruby::{
-        rb_cArray, rb_cFalseClass, rb_cFloat, rb_cInteger, rb_cNilClass, rb_cString, rb_cSymbol,
-        rb_cTrueClass, ruby_value_type, Qfalse, Qnil, Qtrue, RUBY_T_ARRAY, RUBY_T_FALSE,
-        RUBY_T_FIXNUM, RUBY_T_FLOAT, RUBY_T_HASH, RUBY_T_NIL, RUBY_T_STRING, RUBY_T_SYMBOL,
-        RUBY_T_TRUE, SIZEOF_VALUE, VALUE,
+        get_iseq_body_local_table_size, rb_cArray, rb_cFalseClass, rb_cFloat, rb_cInteger,
+        rb_cNilClass, rb_cString, rb_cSymbol, rb_cTrueClass, rb_obj_info, ruby_value_type, Qfalse,
+        Qnil, Qtrue, RUBY_T_ARRAY, RUBY_T_FALSE, RUBY_T_FIXNUM, RUBY_T_FLOAT, RUBY_T_HASH,
+        RUBY_T_NIL, RUBY_T_STRING, RUBY_T_SYMBOL, RUBY_T_TRUE, SIZEOF_VALUE, VALUE,
     },
     dev::options::get_option,
     meta::jit_state::JITState,
 };
+
+// Operand to a YARV bytecode instruction
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum YARVOpnd {
+    // The value is self
+    SelfOpnd,
+
+    // Temporary stack operand with stack index
+    StackOpnd(u8),
+}
+
+impl From<Opnd> for YARVOpnd {
+    fn from(value: Opnd) -> Self {
+        match value {
+            Opnd::Stack { idx, .. } => YARVOpnd::StackOpnd(idx.try_into().unwrap()),
+            _ => unreachable!("{:?} cannot be converted to YARVOpnd", value),
+        }
+    }
+}
 
 // Maximum number of temp value types we keep track of
 pub const MAX_TEMP_TYPES: usize = 8;
@@ -727,5 +747,128 @@ impl From<u8> for LocalIndex {
 impl Default for TempMapping {
     fn default() -> Self {
         TempMapping::Stack
+    }
+}
+
+/// Verify the ctx's types and mappings against the compile-time stack, self,
+/// and locals.
+pub fn verify_ctx(jit: &JITState, ctx: &Context) {
+    fn obj_info_str<'a>(val: VALUE) -> &'a str {
+        unsafe { CStr::from_ptr(rb_obj_info(val)).to_str().unwrap() }
+    }
+
+    // Only able to check types when at current insn
+    assert!(jit.at_current_insn());
+
+    let self_val = jit.peek_at_self();
+    let self_val_type = Type::from(self_val);
+
+    // Verify self operand type
+    if self_val_type.diff(ctx.get_opnd_type(YARVOpnd::SelfOpnd)) == TypeDiff::Incompatible {
+        panic!(
+            "verify_ctx: ctx self type ({:?}) incompatible with actual value of self {}",
+            ctx.get_opnd_type(YARVOpnd::SelfOpnd),
+            obj_info_str(self_val)
+        );
+    }
+
+    // Verify stack operand types
+    let top_idx = cmp::min(ctx.get_stack_size(), MAX_TEMP_TYPES as u8);
+    for i in 0..top_idx {
+        let (learned_mapping, learned_type) = ctx.get_opnd_mapping(YARVOpnd::StackOpnd(i));
+        let stack_val = jit.peek_at_stack(ctx, i as isize);
+        let val_type = Type::from(stack_val);
+
+        match learned_mapping {
+            TempMapping::ToSelf => {
+                if self_val != stack_val {
+                    panic!(
+                        "verify_ctx: stack value was mapped to self, but values did not match!\n  stack: {}\n  self: {}",
+                        obj_info_str(stack_val),
+                        obj_info_str(self_val)
+                    );
+                }
+            }
+            TempMapping::Local(local_idx) => {
+                let local_idx: u8 = local_idx.into();
+                let local_val = jit.peek_at_local(local_idx.into());
+                if local_val != stack_val {
+                    panic!(
+                        "verify_ctx: stack value was mapped to local, but values did not match\n  stack: {}\n  local {}: {}",
+                        obj_info_str(stack_val),
+                        local_idx,
+                        obj_info_str(local_val)
+                    );
+                }
+            }
+            TempMapping::Stack => {}
+        }
+
+        // If the actual type differs from the learned type
+        if val_type.diff(learned_type) == TypeDiff::Incompatible {
+            panic!(
+                "verify_ctx: ctx type ({:?}) incompatible with actual value on stack: {}",
+                learned_type,
+                obj_info_str(stack_val)
+            );
+        }
+    }
+
+    // Verify local variable types
+    let local_table_size = unsafe { get_iseq_body_local_table_size(jit.iseq) };
+    let top_idx: usize = cmp::min(local_table_size as usize, MAX_TEMP_TYPES);
+    for i in 0..top_idx {
+        let learned_type = ctx.get_local_type(i);
+        let local_val = jit.peek_at_local(i as i32);
+        let local_type = Type::from(local_val);
+
+        if local_type.diff(learned_type) == TypeDiff::Incompatible {
+            panic!(
+                "verify_ctx: ctx type ({:?}) incompatible with actual value of local: {} (type {:?})",
+                learned_type,
+                obj_info_str(local_val),
+                local_type
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::meta::context::{Context, Type, TypeDiff, YARVOpnd};
+
+    #[test]
+    fn types() {
+        // Valid src => dst
+        assert_eq!(Type::Unknown.diff(Type::Unknown), TypeDiff::Compatible(0));
+        assert_eq!(
+            Type::UnknownImm.diff(Type::UnknownImm),
+            TypeDiff::Compatible(0)
+        );
+        assert_ne!(Type::UnknownImm.diff(Type::Unknown), TypeDiff::Incompatible);
+        assert_ne!(Type::Fixnum.diff(Type::Unknown), TypeDiff::Incompatible);
+        assert_ne!(Type::Fixnum.diff(Type::UnknownImm), TypeDiff::Incompatible);
+
+        // Invalid src => dst
+        assert_eq!(Type::Unknown.diff(Type::UnknownImm), TypeDiff::Incompatible);
+        assert_eq!(Type::Unknown.diff(Type::Fixnum), TypeDiff::Incompatible);
+        assert_eq!(Type::Fixnum.diff(Type::UnknownHeap), TypeDiff::Incompatible);
+    }
+
+    #[test]
+    fn context() {
+        // Valid src => dst
+        assert_eq!(
+            Context::default().diff(&Context::default()),
+            TypeDiff::Compatible(0)
+        );
+
+        // Try pushing an operand and getting its type
+        let mut ctx = Context::default();
+        ctx.stack_push(Type::Fixnum);
+        let top_type = ctx.get_opnd_type(YARVOpnd::StackOpnd(0));
+        assert!(top_type == Type::Fixnum);
+
+        // TODO: write more tests for Context type diff
     }
 }

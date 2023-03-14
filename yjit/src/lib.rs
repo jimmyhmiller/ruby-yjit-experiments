@@ -6,6 +6,7 @@ mod core;
 mod cruby;
 mod dev;
 mod ffi;
+mod iseq;
 mod meta;
 mod utils;
 mod virtualmem;

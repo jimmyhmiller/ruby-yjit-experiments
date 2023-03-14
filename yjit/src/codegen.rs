@@ -1,22 +1,22 @@
 // We use the YARV bytecode constants which have a CRuby-style name
 #![allow(non_upper_case_globals)]
 
-use std::cmp;
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::mem;
 use std::os::raw::{c_int, c_uint};
 use std::ptr;
 use std::slice;
 
 use crate::bbv::limit_block_versions;
+use crate::iseq::get_or_create_iseq_payload;
+use crate::meta::context::{verify_ctx, YARVOpnd};
 pub use crate::virtualmem::CodePtr;
 use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP},
     core::{
-        free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump,
-        get_or_create_iseq_payload, make_branch_entry, set_branch_target, verify_blockid, YARVOpnd,
+        free_block, gen_branch, gen_branch_stub_hit_trampoline, gen_direct_jump, make_branch_entry,
+        set_branch_target, verify_blockid,
     },
     counted_exit,
     // Intentionally expanding all of these so we can see all the stuff we depend on.
@@ -49,11 +49,11 @@ use crate::{
         rb_hash_stlike_foreach, rb_hash_stlike_lookup, rb_intern, rb_iseq_opcode_at_pc,
         rb_iseq_pc_at_idx, rb_iseq_t, rb_ivar_get, rb_leaf_builtin_function, rb_mKernel,
         rb_mRubyVMFrozenCore, rb_method_definition_t, rb_method_entry_at, rb_obj_as_string_result,
-        rb_obj_class, rb_obj_info, rb_obj_is_kind_of, rb_optimized_call, rb_range_new,
-        rb_reg_last_match, rb_reg_match_last, rb_reg_match_post, rb_reg_match_pre, rb_reg_new_ary,
-        rb_reg_nth_match, rb_shape_get_iv_index, rb_shape_get_next, rb_shape_get_shape_by_id,
-        rb_shape_get_shape_id, rb_shape_id, rb_shape_id_offset, rb_shape_transition_shape_capa,
-        rb_singleton_class, rb_str_buf_append, rb_str_bytesize, rb_str_concat_literals, rb_str_dup,
+        rb_obj_class, rb_obj_is_kind_of, rb_optimized_call, rb_range_new, rb_reg_last_match,
+        rb_reg_match_last, rb_reg_match_post, rb_reg_match_pre, rb_reg_new_ary, rb_reg_nth_match,
+        rb_shape_get_iv_index, rb_shape_get_next, rb_shape_get_shape_by_id, rb_shape_get_shape_id,
+        rb_shape_id, rb_shape_id_offset, rb_shape_transition_shape_capa, rb_singleton_class,
+        rb_str_buf_append, rb_str_bytesize, rb_str_concat_literals, rb_str_dup,
         rb_str_eql_internal, rb_str_intern, rb_str_neq_internal, rb_sym2id, rb_vm_bh_to_procval,
         rb_vm_concat_array, rb_vm_defined, rb_vm_ep_local_ep, rb_vm_frame_method_entry,
         rb_vm_getclassvariable, rb_vm_ic_hit_p, rb_vm_set_ivar_id, rb_vm_setclassvariable,
@@ -100,7 +100,7 @@ use crate::{
     gen_counter_incr,
     meta::block::{Block, BlockId, BlockRef, BranchGenFn, BranchShape},
     meta::call_info::CallInfo,
-    meta::context::{Context, TempMapping, Type, TypeDiff, MAX_TEMP_TYPES},
+    meta::context::{Context, Type, TypeDiff},
     meta::invariants::{
         assume_method_basic_definition, assume_method_lookup_stable, assume_single_ractor_mode,
         assume_stable_constant_names, Invariants,
@@ -171,89 +171,6 @@ fn record_global_inval_patch(asm: &mut Assembler, outline_block_target_pos: Code
     asm.pos_marker(move |code_ptr| {
         CodegenGlobals::push_global_inval_patch(code_ptr, outline_block_target_pos);
     });
-}
-
-/// Verify the ctx's types and mappings against the compile-time stack, self,
-/// and locals.
-fn verify_ctx(jit: &JITState, ctx: &Context) {
-    fn obj_info_str<'a>(val: VALUE) -> &'a str {
-        unsafe { CStr::from_ptr(rb_obj_info(val)).to_str().unwrap() }
-    }
-
-    // Only able to check types when at current insn
-    assert!(jit.at_current_insn());
-
-    let self_val = jit.peek_at_self();
-    let self_val_type = Type::from(self_val);
-
-    // Verify self operand type
-    if self_val_type.diff(ctx.get_opnd_type(YARVOpnd::SelfOpnd)) == TypeDiff::Incompatible {
-        panic!(
-            "verify_ctx: ctx self type ({:?}) incompatible with actual value of self {}",
-            ctx.get_opnd_type(YARVOpnd::SelfOpnd),
-            obj_info_str(self_val)
-        );
-    }
-
-    // Verify stack operand types
-    let top_idx = cmp::min(ctx.get_stack_size(), MAX_TEMP_TYPES as u8);
-    for i in 0..top_idx {
-        let (learned_mapping, learned_type) = ctx.get_opnd_mapping(YARVOpnd::StackOpnd(i));
-        let stack_val = jit.peek_at_stack(ctx, i as isize);
-        let val_type = Type::from(stack_val);
-
-        match learned_mapping {
-            TempMapping::ToSelf => {
-                if self_val != stack_val {
-                    panic!(
-                        "verify_ctx: stack value was mapped to self, but values did not match!\n  stack: {}\n  self: {}",
-                        obj_info_str(stack_val),
-                        obj_info_str(self_val)
-                    );
-                }
-            }
-            TempMapping::Local(local_idx) => {
-                let local_idx: u8 = local_idx.into();
-                let local_val = jit.peek_at_local(local_idx.into());
-                if local_val != stack_val {
-                    panic!(
-                        "verify_ctx: stack value was mapped to local, but values did not match\n  stack: {}\n  local {}: {}",
-                        obj_info_str(stack_val),
-                        local_idx,
-                        obj_info_str(local_val)
-                    );
-                }
-            }
-            TempMapping::Stack => {}
-        }
-
-        // If the actual type differs from the learned type
-        if val_type.diff(learned_type) == TypeDiff::Incompatible {
-            panic!(
-                "verify_ctx: ctx type ({:?}) incompatible with actual value on stack: {}",
-                learned_type,
-                obj_info_str(stack_val)
-            );
-        }
-    }
-
-    // Verify local variable types
-    let local_table_size = unsafe { get_iseq_body_local_table_size(jit.iseq) };
-    let top_idx: usize = cmp::min(local_table_size as usize, MAX_TEMP_TYPES);
-    for i in 0..top_idx {
-        let learned_type = ctx.get_local_type(i);
-        let local_val = jit.peek_at_local(i as i32);
-        let local_type = Type::from(local_val);
-
-        if local_type.diff(learned_type) == TypeDiff::Incompatible {
-            panic!(
-                "verify_ctx: ctx type ({:?}) incompatible with actual value of local: {} (type {:?})",
-                learned_type,
-                obj_info_str(local_val),
-                local_type
-            );
-        }
-    }
 }
 
 // Fill code_for_exit_from_stub. This is used by branch_stub_hit() to exit

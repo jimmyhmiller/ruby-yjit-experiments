@@ -5,7 +5,6 @@
 
 use crate::{
     codegen::CodegenGlobals,
-    core::for_each_iseq_payload,
     cruby::{
         insn_name, rb_gc_mark, rb_hash_aset, rb_hash_new, rb_profile_frames,
         rb_vm_insn_addr2opcode, rb_yjit_exit_locations_dict, rust_str_to_sym, size_t, src_loc,
@@ -13,6 +12,7 @@ use crate::{
     },
     dev::options::get_option,
     ffi::yjit_enabled_p,
+    iseq::for_each_iseq_payload,
     meta::context::Context,
 };
 
