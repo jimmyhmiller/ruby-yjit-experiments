@@ -104,6 +104,7 @@ use crate::{
     },
     meta::jit_state::JITState,
     utils::{iseq_get_location, print_str, IntoUsize},
+    codegen::globals::{CodegenGlobals}
 };
 
 pub mod globals;
@@ -120,6 +121,8 @@ enum CodegenStatus {
 type InsnGenFn = fn(code_generator: &mut CodeGenerator) -> CodegenStatus;
 
 use crate::codegen::JCCKinds::*;
+
+
 
 #[allow(non_camel_case_types, unused)]
 pub enum JCCKinds {
@@ -168,7 +171,7 @@ fn gen_save_sp(asm: &mut Assembler, ctx: &mut Context) {
 fn record_global_inval_patch(asm: &mut Assembler, outline_block_target_pos: CodePtr) {
     asm.pad_inval_patch();
     asm.pos_marker(move |code_ptr| {
-        globals::CodegenGlobals::push_global_inval_patch(code_ptr, outline_block_target_pos);
+        CodegenGlobals::push_global_inval_patch(code_ptr, outline_block_target_pos);
     });
 }
 
@@ -377,7 +380,7 @@ pub fn gen_entry_prologue(cb: &mut CodeBlock, iseq: IseqPtr, insn_idx: u32) -> O
     // Setup cfp->jit_return
     asm.mov(
         Opnd::mem(64, CFP, RUBY_OFFSET_CFP_JIT_RETURN),
-        Opnd::const_ptr(globals::CodegenGlobals::get_leave_exit_code().raw_ptr()),
+        Opnd::const_ptr(CodegenGlobals::get_leave_exit_code().raw_ptr()),
     );
 
     // We're compiling iseqs that we *expect* to start at `insn_idx`. But in
@@ -453,7 +456,7 @@ pub fn gen_single_block(
     // Create a backend assembler instance
     let asm = Assembler::new();
 
-    let mut code_generator = CodeGenerator::new(jit, ctx, asm);
+    let mut code_generator = CodeGenerator::new(jit, ctx, asm, CodegenGlobals::get_outlined_cb());
 
     #[cfg(feature = "disasm")]
     if get_option_ref!(dump_disasm).is_some() {
@@ -620,15 +623,16 @@ pub struct CodeGenerator {
     pub jit: JITState,
     pub ctx: Context,
     pub asm: Assembler,
+    pub ocb: &'static mut OutlinedCb,
 }
 
 impl CodeGenerator {
-    pub fn new(jit: JITState, ctx: Context, asm: Assembler) -> Self {
-        Self { jit, ctx, asm }
+    pub fn new(jit: JITState, ctx: Context, asm: Assembler, ocb: &'static mut OutlinedCb) -> Self {
+        Self { jit, ctx, asm, ocb }
     }
 
     pub fn get_ocb(&mut self) -> &mut OutlinedCb {
-        globals::CodegenGlobals::get_outlined_cb()
+       self.ocb
     }
 
     /// A public function that can be called from within the code generation
@@ -4389,7 +4393,7 @@ impl CodeGenerator {
         // Record code position for TracePoint patching. See full_cfunc_return().
         record_global_inval_patch(
             &mut self.asm,
-            globals::CodegenGlobals::get_outline_full_cfunc_return_pos(),
+            CodegenGlobals::get_outline_full_cfunc_return_pos(),
         );
 
         // Push the return value on the Ruby stack
@@ -6903,7 +6907,7 @@ fn get_gen_fn(opcode: VALUE) -> Option<InsnGenFn> {
 fn lookup_cfunc_codegen(def: *const rb_method_definition_t) -> Option<globals::MethodGenFn> {
     let method_serial = unsafe { get_def_method_serial(def) };
 
-    globals::CodegenGlobals::look_up_codegen_method(method_serial)
+    CodegenGlobals::look_up_codegen_method(method_serial)
 }
 
 // Is anyone listening for :c_call and :c_return event currently?
@@ -6982,43 +6986,46 @@ pub struct CodepagePatch {
     pub outlined_target_pos: CodePtr,
 }
 
-// TODO: Uncomment these tests
-// Need to deal with the fact that OCB is a global in real codegen
-// but not here.
-// I don't like the global ocb thing anyways. Will fix later.
+// Getting some weird allocation failures. Not sure why...
+
 // #[cfg(test)]
 // mod tests {
+
 //     use super::*;
 
-//     fn setup_codegen() -> (CodeGenerator, CodeBlock, OutlinedCb) {
+//     static mut OCB: Option<OutlinedCb> = None;
+
+//     fn setup_codegen() -> (CodeGenerator, CodeBlock) {
 //         let blockid = BlockId {
 //             iseq: ptr::null(),
 //             idx: 0,
 //         };
 //         let cb = CodeBlock::new_dummy(256 * 1024);
 //         let block = Block::make_ref(blockid, &Context::default(), cb.get_write_ptr());
-
+//         unsafe {
+//             OCB = Some(OutlinedCb::wrap(CodeBlock::new_dummy(256 * 1024)));
+//         }
 //         (
 //             CodeGenerator::new(
 //                 JITState::new(&block),
 //                 Context::default(),
 //                 Assembler::new(),
+//                 unsafe { OCB.as_mut().unwrap() }
 //             ),
 //             cb,
-//             OutlinedCb::wrap(CodeBlock::new_dummy(256 * 1024)),
 //         )
 //     }
 
 //     #[test]
 //     fn test_gen_leave_exit() {
-//         let mut ocb = OutlinedCb::wrap(CodeBlock::new_dummy(256 * 1024));
-//         gen_leave_exit(&mut ocb);
-//         assert!(ocb.unwrap().get_write_pos() > 0);
+//         let (mut gen, _) = setup_codegen();
+//         gen_leave_exit(&mut gen.ocb);
+//         assert!(gen.ocb.unwrap().get_write_pos() > 0);
 //     }
 
 //     #[test]
 //     fn test_gen_exit() {
-//         let (mut gen, mut cb, _) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         gen_exit(std::ptr::null_mut::<VALUE>(), &gen.ctx, &mut gen.asm);
 //         gen.asm.compile(&mut cb);
 //         assert!(cb.get_write_pos() > 0);
@@ -7026,21 +7033,21 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_get_side_exit() {
-//         let (mut gen, _, mut ocb) = setup_codegen();
+//         let (mut gen, _) = setup_codegen();
 //         gen.get_side_exit(&gen.ctx.clone());
-//         assert!(ocb.unwrap().get_write_pos() > 0);
+//         assert!(gen.ocb.unwrap().get_write_pos() > 0);
 //     }
 
 //     #[test]
 //     fn test_gen_check_ints() {
-//         let (mut gen, _cb, mut ocb) = setup_codegen();
-//         let side_exit = ocb.unwrap().get_write_ptr().as_side_exit();
+//         let (mut gen, _cb) = setup_codegen();
+//         let side_exit = gen.ocb.unwrap().get_write_ptr().as_side_exit();
 //         gen_check_ints(&mut gen.asm, side_exit);
 //     }
 
 //     #[test]
 //     fn test_gen_nop() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         let status = gen.gen_nop();
 //         gen.asm.compile(&mut cb);
 
@@ -7051,18 +7058,17 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_pop() {
-//         let (mut gen, _cb, _ocb) = setup_codegen();
-//         let mut context = Context::default();
-//         context.stack_push(Type::Fixnum);
+//         let (mut gen, _cb) = setup_codegen();
+//         gen.ctx.stack_push(Type::Fixnum);
 //         let status = gen.gen_pop();
 
 //         assert_eq!(status, CodegenStatus::KeepCompiling);
-//         assert_eq!(context.diff(&Context::default()), TypeDiff::Compatible(0));
+//         assert_eq!(gen.ctx.diff(&Context::default()), TypeDiff::Compatible(0));
 //     }
 
 //     #[test]
 //     fn test_gen_dup() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         gen.ctx.stack_push(Type::Fixnum);
 //         let status = gen.gen_dup();
 
@@ -7078,7 +7084,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_dupn() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         gen.ctx.stack_push(Type::Fixnum);
 //         gen.ctx.stack_push(Type::Flonum);
 
@@ -7102,7 +7108,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_swap() {
-//         let (mut gen, _cb, _ocb) = setup_codegen();
+//         let (mut gen, _cb) = setup_codegen();
 //         gen.ctx.stack_push(Type::Fixnum);
 //         gen.ctx.stack_push(Type::Flonum);
 
@@ -7118,7 +7124,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_putnil() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         let status = gen.gen_putnil();
 
 //         let (_, tmp_type_top) = gen.ctx.get_opnd_mapping(YARVOpnd::StackOpnd(0));
@@ -7132,7 +7138,7 @@ pub struct CodepagePatch {
 //     #[test]
 //     fn test_putobject_qtrue() {
 //         // Test gen_putobject with Qtrue
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 
 //         let mut value_array: [u64; 2] = [0, Qtrue.into()];
 //         let pc: *mut VALUE = &mut value_array as *mut u64 as *mut VALUE;
@@ -7151,7 +7157,7 @@ pub struct CodepagePatch {
 //     #[test]
 //     fn test_putobject_fixnum() {
 //         // Test gen_putobject with a Fixnum to test another conditional branch
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 
 //         // The Fixnum 7 is encoded as 7 * 2 + 1, or 15
 //         let mut value_array: [u64; 2] = [0, 15];
@@ -7170,7 +7176,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_int2fix() {
-//         let (mut gen, _cb, _ocb) = setup_codegen();
+//         let (mut gen, _cb) = setup_codegen();
 //         gen.jit.opcode = YARVINSN_putobject_INT2FIX_0_.into_usize();
 //         let status = gen.gen_putobject_int2fix();
 
@@ -7183,7 +7189,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_putself() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         let status = gen.gen_putself();
 
 //         assert_eq!(status, CodegenStatus::KeepCompiling);
@@ -7193,7 +7199,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_setn() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         gen.ctx.stack_push(Type::Fixnum);
 //         gen.ctx.stack_push(Type::Flonum);
 //         gen.ctx.stack_push(Type::CString);
@@ -7216,7 +7222,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_topn() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         gen.ctx.stack_push(Type::Flonum);
 //         gen.ctx.stack_push(Type::CString);
 
@@ -7238,7 +7244,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_adjuststack() {
-//         let (mut gen, mut cb, _ocb) = setup_codegen();
+//         let (mut gen, mut cb) = setup_codegen();
 //         gen.ctx.stack_push(Type::Flonum);
 //         gen.ctx.stack_push(Type::CString);
 //         gen.ctx.stack_push(Type::Fixnum);
@@ -7259,7 +7265,7 @@ pub struct CodepagePatch {
 
 //     #[test]
 //     fn test_gen_leave() {
-//         let (mut gen, _cb, _ocb) = setup_codegen();
+//         let (mut gen, _cb) = setup_codegen();
 //         // Push return value
 //         gen.ctx.stack_push(Type::Fixnum);
 //         gen.gen_leave();
