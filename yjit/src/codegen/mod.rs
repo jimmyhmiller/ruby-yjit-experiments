@@ -580,6 +580,7 @@ pub fn gen_single_block(
 
     // Finish filling out the block
     {
+        CodegenGlobals::set_outlined_cb(code_generator.ocb);
         let mut block = code_generator.jit.block.borrow_mut();
         if block.entry_exit.is_some() {
             code_generator.asm.pad_inval_patch();
@@ -608,14 +609,15 @@ pub fn gen_single_block(
     // doesn't go to the next instruction.
     assert!(!code_generator.jit.record_boundary_patch_point);
 
+    let ocb_dropped_bytes = CodegenGlobals::map_outlined_cb(|ocb| {
+        ocb.unwrap().has_dropped_bytes()
+    }).unwrap();
     // If code for the block doesn't fit, fail
-    if cb.has_dropped_bytes() || code_generator.ocb.unwrap().has_dropped_bytes() {
+    if cb.has_dropped_bytes() || ocb_dropped_bytes {
         free_block(&blockref);
-        CodegenGlobals::set_outlined_cb(code_generator.ocb);
         return Err(());
     }
 
-    CodegenGlobals::set_outlined_cb(code_generator.ocb);
 
 
     // Block compiled successfully

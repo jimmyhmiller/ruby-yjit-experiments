@@ -264,6 +264,8 @@ impl CodegenGlobals {
         let globals = CodegenGlobals::get_instance();
         if let Some(outlined_cb) = &mut globals.outlined_cb {
             f(outlined_cb);
+        } else {
+            panic!("No outlined code block available in with");
         }
     }
 
@@ -272,7 +274,7 @@ impl CodegenGlobals {
         if let Some(outlined_cb) = &mut globals.outlined_cb {
             Some(f(outlined_cb))
         } else {
-            None
+            panic!("No outlined code block available in map");
         }
     }
 
