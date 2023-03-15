@@ -7,7 +7,7 @@ use std::mem::take;
 use crate::asm::x86_64::*;
 use crate::asm::*;
 use crate::backend::ir::*;
-use crate::codegen::CodegenGlobals;
+use crate::codegen::globals::CodegenGlobals;
 use crate::cruby::*;
 use crate::meta::jit_state::JITState;
 
