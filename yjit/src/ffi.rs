@@ -156,9 +156,11 @@ pub extern "C" fn rb_yjit_simulate_oom_bang(_ec: EcPtr, _ruby_self: VALUE) -> VA
     // Enabled in debug mode only for security
     if cfg!(debug_assertions) {
         let cb = CodegenGlobals::get_inline_cb();
-        let ocb = CodegenGlobals::get_outlined_cb().unwrap();
         cb.set_pos(cb.get_mem_size());
-        ocb.set_pos(ocb.get_mem_size());
+        CodegenGlobals::with_outlined_cb(|ocb| {
+            let ocb = ocb.unwrap();
+            ocb.set_pos(ocb.get_mem_size())
+        });
     }
 
     Qnil
@@ -313,7 +315,8 @@ pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
     // Note that we would have returned already if YJIT is off.
     cb.mark_all_executable();
 
-    CodegenGlobals::get_outlined_cb()
-        .unwrap()
-        .mark_all_executable();
+    CodegenGlobals::with_outlined_cb(|ocb| {
+        ocb.unwrap().mark_all_executable();
+    });
+
 }

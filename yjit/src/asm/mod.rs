@@ -166,9 +166,14 @@ impl CodeBlock {
 
         // Move the other CodeBlock to the same page if it's on the furthest page
         #[cfg(not(test))]
-        self.other_cb()
-            .unwrap()
-            .set_page(next_page_idx.unwrap(), &jmp_ptr);
+        if self.inline() {
+            CodegenGlobals::with_outlined_cb(|ocb| {
+                ocb.unwrap().set_page(next_page_idx.unwrap(), &jmp_ptr);
+            })
+        } else {
+            CodegenGlobals::get_inline_cb().set_page(next_page_idx.unwrap(), &jmp_ptr);
+        }
+
 
         !self.dropped_bytes
     }
@@ -681,16 +686,18 @@ impl CodeBlock {
             cb.dropped_bytes = false;
             cb.clear_comments();
 
-            let mut ocb = CodegenGlobals::get_outlined_cb().unwrap();
-            ocb.write_pos = ocb.get_page_pos(first_page);
-            ocb.dropped_bytes = false;
-            ocb.clear_comments();
+            CodegenGlobals::with_outlined_cb(|ocb| {
+                let ocb = ocb.unwrap();
+                ocb.write_pos = ocb.get_page_pos(first_page);
+                ocb.dropped_bytes = false;
+                ocb.clear_comments();
+            });
         }
 
         // Track which pages are free.
         let new_freed_pages = Rc::new(Some(freed_pages));
         let old_freed_pages = mem::replace(&mut self.freed_pages, Rc::clone(&new_freed_pages));
-        self.other_cb().unwrap().freed_pages = new_freed_pages;
+        self.set_freed_pages_other(new_freed_pages);
         assert_eq!(1, Rc::strong_count(&old_freed_pages)); // will deallocate
 
         CodegenGlobals::incr_code_gc_count();
@@ -700,13 +707,15 @@ impl CodeBlock {
         !self.outlined
     }
 
-    pub fn other_cb(&self) -> Option<&'static mut Self> {
+    pub fn set_freed_pages_other(&self, freed_pages: Rc<Option<Vec<usize>>>) {
         if !CodegenGlobals::has_instance() {
-            None
+            panic!("No instance of CodegenGlobals");
         } else if self.inline() {
-            Some(CodegenGlobals::get_outlined_cb().unwrap())
+            CodegenGlobals::with_outlined_cb(|ocb| {
+                ocb.unwrap().freed_pages = freed_pages;
+            });
         } else {
-            Some(CodegenGlobals::get_inline_cb())
+            CodegenGlobals::get_inline_cb().freed_pages = freed_pages;
         }
     }
 }

@@ -458,13 +458,14 @@ fn rb_yjit_gen_stats_dict(context: bool) -> VALUE {
     unsafe {
         // Get the inline and outlined code blocks
         let cb = CodegenGlobals::get_inline_cb();
-        let ocb = CodegenGlobals::get_outlined_cb();
+        let ocb_code_size =
+            CodegenGlobals::map_outlined_cb(|ocb| ocb.unwrap().code_size()).unwrap();
 
         // Inline code size
         hash_aset_usize!(hash, "inline_code_size", cb.code_size());
 
         // Outlined code size
-        hash_aset_usize!(hash, "outlined_code_size", ocb.unwrap().code_size());
+        hash_aset_usize!(hash, "outlined_code_size", ocb_code_size);
 
         // GCed pages
         let freed_page_count = cb.num_freed_pages();

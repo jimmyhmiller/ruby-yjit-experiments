@@ -35,9 +35,8 @@ fn gen_block_series(
     start_ctx: &Context,
     ec: EcPtr,
     cb: &mut CodeBlock,
-    ocb: &mut OutlinedCb,
 ) -> Option<BlockRef> {
-    let result = gen_block_series_body(blockid, start_ctx, ec, cb, ocb);
+    let result = gen_block_series_body(blockid, start_ctx, ec, cb);
     if result.is_none() {
         incr_counter!(compilation_failure);
     }
@@ -52,14 +51,13 @@ pub fn gen_block_series_body(
     start_ctx: &Context,
     ec: EcPtr,
     cb: &mut CodeBlock,
-    ocb: &mut OutlinedCb,
 ) -> Option<BlockRef> {
     // Keep track of all blocks compiled in this batch
     const EXPECTED_BATCH_SIZE: usize = 4;
     let mut batch = Vec::with_capacity(EXPECTED_BATCH_SIZE);
 
     // Generate code for the first block
-    let first_block = gen_single_block(blockid, start_ctx, ec, cb, ocb).ok()?;
+    let first_block = gen_single_block(blockid, start_ctx, ec, cb).ok()?;
     batch.push(first_block.clone()); // Keep track of this block version
 
     // Add the block version to the VersionMap for this ISEQ
@@ -94,7 +92,7 @@ pub fn gen_block_series_body(
         let requested_ctx = last_target.get_ctx();
 
         // Generate new block using context from the last branch.
-        let result = gen_single_block(requested_blockid, &requested_ctx, ec, cb, ocb);
+        let result = gen_single_block(requested_blockid, &requested_ctx, ec, cb);
 
         // If the block failed to compile
         if result.is_err() {
@@ -175,17 +173,15 @@ pub fn gen_entry_point(iseq: IseqPtr, ec: EcPtr) -> Option<CodePtr> {
 
     // Get the inline and outlined code blocks
     let cb = CodegenGlobals::get_inline_cb();
-    let ocb = CodegenGlobals::get_outlined_cb();
 
     // Write the interpreter entry prologue. Might be NULL when out of memory.
     let code_ptr = gen_entry_prologue(cb, iseq, insn_idx);
 
     // Try to generate code for the entry block
-    let block = gen_block_series(blockid, &Context::default(), ec, cb, ocb);
+    let block = gen_block_series(blockid, &Context::default(), ec, cb);
 
     cb.mark_all_executable();
-    ocb.unwrap().mark_all_executable();
-
+    CodegenGlobals::with_outlined_cb(|ocb| ocb.unwrap().mark_all_executable());
     match block {
         // Compilation failed
         None => {
@@ -329,7 +325,6 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
     };
 
     let cb = CodegenGlobals::get_inline_cb();
-    let ocb = CodegenGlobals::get_outlined_cb();
 
     // If this branch has already been patched, return the dst address
     // Note: ractors can cause the same stub to be hit multiple times
@@ -392,7 +387,7 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
 
         // Compile the new block version
         drop(branch); // Stop mutable RefCell borrow since GC might borrow branch for marking
-        block = gen_block_series(target_blockid, &target_ctx, ec, cb, ocb);
+        block = gen_block_series(target_blockid, &target_ctx, ec, cb);
         branch = branch_rc.borrow_mut();
 
         if block.is_none() && branch_modified {
@@ -453,7 +448,10 @@ fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -
         }
     };
 
-    ocb.unwrap().mark_all_executable();
+    CodegenGlobals::with_outlined_cb(|ocb| {
+        ocb.unwrap().mark_all_executable();
+    });
+
     cb.mark_all_executable();
 
     let new_branch_size = branch.code_size();
@@ -744,7 +742,6 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
 
     let block = blockref.borrow();
     let cb = CodegenGlobals::get_inline_cb();
-    let ocb = CodegenGlobals::get_outlined_cb();
 
     verify_blockid(block.blockid);
 
@@ -831,15 +828,18 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
             assert_eq!(blockref, incoming_block);
         }
 
-        // Create a stub for this branch target or rewire it to a valid block
-        set_branch_target(
-            target_idx as u32,
-            block.blockid,
-            &block.ctx,
-            branchref,
-            &mut branch,
-            ocb,
-        );
+
+        CodegenGlobals::with_outlined_cb(|ocb|  {
+            // Create a stub for this branch target or rewire it to a valid block
+            set_branch_target(
+                target_idx as u32,
+                block.blockid,
+                &block.ctx,
+                branchref,
+                &mut branch,
+                ocb,
+            );
+        });
 
         if branch.targets[target_idx].is_none() {
             // We were unable to generate a stub (e.g. OOM). Use the block's
@@ -901,7 +901,9 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
 
     delayed_deallocation(blockref);
 
-    ocb.unwrap().mark_all_executable();
+    CodegenGlobals::with_outlined_cb(|ocb|  {
+        ocb.unwrap().mark_all_executable();
+    });
     cb.mark_all_executable();
 
     incr_counter!(invalidation_count);

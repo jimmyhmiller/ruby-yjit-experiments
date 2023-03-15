@@ -523,9 +523,8 @@ pub extern "C" fn rb_yjit_tracing_invalidate_all() {
         cb.set_pos(old_pos);
         cb.set_dropped_bytes(old_dropped_bytes);
 
-        CodegenGlobals::get_outlined_cb()
-            .unwrap()
-            .mark_all_executable();
-        cb.mark_all_executable();
+        CodegenGlobals::with_outlined_cb(|ocb| {
+            ocb.unwrap().mark_all_executable();
+        });
     });
 }

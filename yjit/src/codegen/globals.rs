@@ -33,7 +33,7 @@ pub struct CodegenGlobals {
     inline_cb: CodeBlock,
 
     /// Outlined code block (slow path)
-    outlined_cb: OutlinedCb,
+    outlined_cb: Option<OutlinedCb>,
 
     /// Code for exiting back to the interpreter from the leave instruction
     leave_exit_code: CodePtr,
@@ -138,7 +138,7 @@ impl CodegenGlobals {
 
         let mut codegen_globals = CodegenGlobals {
             inline_cb: cb,
-            outlined_cb: ocb,
+            outlined_cb: Some(ocb),
             leave_exit_code,
             stub_exit_code,
             outline_full_cfunc_return_pos: cfunc_exit_code,
@@ -252,9 +252,28 @@ impl CodegenGlobals {
         &mut CodegenGlobals::get_instance().inline_cb
     }
 
-    /// Get a mutable reference to the outlined code block
-    pub fn get_outlined_cb() -> &'static mut OutlinedCb {
-        &mut CodegenGlobals::get_instance().outlined_cb
+    pub fn set_outlined_cb(value: OutlinedCb) {
+        CodegenGlobals::get_instance().outlined_cb = Some(value);
+    }
+
+    pub fn take_outlined_cb() -> Option<OutlinedCb> {
+        CodegenGlobals::get_instance().outlined_cb.take()
+    }
+
+    pub fn with_outlined_cb<F: FnOnce(&mut OutlinedCb)>(f: F) {
+        let globals = CodegenGlobals::get_instance();
+        if let Some(outlined_cb) = &mut globals.outlined_cb {
+            f(outlined_cb);
+        }
+    }
+
+    pub fn map_outlined_cb<F: FnOnce(&mut OutlinedCb) -> T, T>(f: F) -> Option<T> {
+        let globals = CodegenGlobals::get_instance();
+        if let Some(outlined_cb) = &mut globals.outlined_cb {
+            Some(f(outlined_cb))
+        } else {
+            None
+        }
     }
 
     pub fn get_leave_exit_code() -> CodePtr {
