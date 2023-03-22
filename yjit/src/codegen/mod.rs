@@ -434,6 +434,7 @@ pub fn gen_single_block(
 ) -> Result<BlockRef, ()> {
     // Limit the number of specialized versions for this block
     let ctx = limit_block_versions(blockid, start_ctx);
+    let starting_ctx = ctx.clone();
 
     verify_blockid(blockid);
     assert!(!(blockid.idx == 0 && ctx.get_stack_size() > 0));
@@ -547,12 +548,12 @@ pub fn gen_single_block(
 
             let mut block = code_generator.jit.block.borrow_mut();
 
-            // TODO: if the codegen function makes changes to ctx and then return YJIT_CANT_COMPILE,
-            // the exit this generates would be wrong. We could save a copy of the entry context
-            // and assert that ctx is the same here.
+            // We are using starting_ctx so that if code_generator.ctx got mutated
+            // it won't matter. If you write to the stack to you could still get errors,
+            // but not from simple push and pops
             gen_exit(
                 code_generator.jit.pc,
-                &code_generator.ctx,
+                &starting_ctx,
                 &mut code_generator.asm,
             );
 
