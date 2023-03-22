@@ -318,5 +318,4 @@ pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
     CodegenGlobals::with_outlined_cb(|ocb| {
         ocb.unwrap().mark_all_executable();
     });
-
 }

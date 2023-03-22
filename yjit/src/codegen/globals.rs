@@ -8,9 +8,8 @@ use crate::{
     },
     core::gen_branch_stub_hit_trampoline,
     cruby::{
-        get_def_method_serial, rb_cArray, rb_cBasicObject, rb_cInteger, rb_cModule, rb_cNilClass,
-        rb_cString, rb_cSymbol, rb_cThread, rb_callable_method_entry_t, rb_callinfo, rb_intern,
-        rb_mKernel, rb_method_entry_at, rb_singleton_class, IseqPtr, VALUE,
+        get_def_method_serial, rb_callable_method_entry_t, rb_callinfo, rb_intern,
+        rb_method_entry_at, IseqPtr, VALUE,
     },
     dev::options::get_option,
 };
@@ -150,7 +149,7 @@ impl CodegenGlobals {
         };
 
         // Register the method codegen functions
-        codegen_globals.reg_method_codegen_fns();
+        CodeGenerator::init_overrides(&mut codegen_globals);
 
         // Initialize the codegen globals instance
         unsafe {
@@ -182,60 +181,6 @@ impl CodegenGlobals {
         };
 
         self.method_codegen_table.insert(method_serial, gen_fn);
-    }
-
-    /// Register codegen functions for some Ruby core methods
-    pub fn reg_method_codegen_fns(&mut self) {
-        unsafe {
-            // Specialization for C methods. See yjit_reg_method() for details.
-            self.yjit_reg_method(rb_cBasicObject, "!", CodeGenerator::jit_rb_obj_not);
-
-            self.yjit_reg_method(rb_cNilClass, "nil?", CodeGenerator::jit_rb_true);
-            self.yjit_reg_method(rb_mKernel, "nil?", CodeGenerator::jit_rb_false);
-            self.yjit_reg_method(rb_mKernel, "is_a?", CodeGenerator::jit_rb_kernel_is_a);
-            self.yjit_reg_method(rb_mKernel, "kind_of?", CodeGenerator::jit_rb_kernel_is_a);
-            self.yjit_reg_method(
-                rb_mKernel,
-                "instance_of?",
-                CodeGenerator::jit_rb_kernel_instance_of,
-            );
-
-            self.yjit_reg_method(rb_cBasicObject, "==", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cBasicObject, "equal?", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cBasicObject, "!=", CodeGenerator::jit_rb_obj_not_equal);
-            self.yjit_reg_method(rb_mKernel, "eql?", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cModule, "==", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cModule, "===", CodeGenerator::jit_rb_mod_eqq);
-            self.yjit_reg_method(rb_cSymbol, "==", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cSymbol, "===", CodeGenerator::jit_rb_obj_equal);
-            self.yjit_reg_method(rb_cInteger, "==", CodeGenerator::jit_rb_int_equal);
-            self.yjit_reg_method(rb_cInteger, "===", CodeGenerator::jit_rb_int_equal);
-
-            // rb_str_to_s() methods in string.c
-            self.yjit_reg_method(rb_cString, "empty?", CodeGenerator::jit_rb_str_empty_p);
-            self.yjit_reg_method(rb_cString, "to_s", CodeGenerator::jit_rb_str_to_s);
-            self.yjit_reg_method(rb_cString, "to_str", CodeGenerator::jit_rb_str_to_s);
-            self.yjit_reg_method(rb_cString, "bytesize", CodeGenerator::jit_rb_str_bytesize);
-            self.yjit_reg_method(rb_cString, "<<", CodeGenerator::jit_rb_str_concat);
-            self.yjit_reg_method(rb_cString, "+@", CodeGenerator::jit_rb_str_uplus);
-
-            // rb_ary_empty_p() method in array.c
-            self.yjit_reg_method(rb_cArray, "empty?", CodeGenerator::jit_rb_ary_empty_p);
-
-            self.yjit_reg_method(rb_mKernel, "respond_to?", CodeGenerator::jit_obj_respond_to);
-            self.yjit_reg_method(
-                rb_mKernel,
-                "block_given?",
-                CodeGenerator::jit_rb_f_block_given_p,
-            );
-
-            // Thread.current
-            self.yjit_reg_method(
-                rb_singleton_class(rb_cThread),
-                "current",
-                CodeGenerator::jit_thread_s_current,
-            );
-        }
     }
 
     /// Get a mutable reference to the codegen globals instance

@@ -828,8 +828,7 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
             assert_eq!(blockref, incoming_block);
         }
 
-
-        CodegenGlobals::with_outlined_cb(|ocb|  {
+        CodegenGlobals::with_outlined_cb(|ocb| {
             // Create a stub for this branch target or rewire it to a valid block
             set_branch_target(
                 target_idx as u32,
@@ -901,7 +900,7 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
 
     delayed_deallocation(blockref);
 
-    CodegenGlobals::with_outlined_cb(|ocb|  {
+    CodegenGlobals::with_outlined_cb(|ocb| {
         ocb.unwrap().mark_all_executable();
     });
     cb.mark_all_executable();

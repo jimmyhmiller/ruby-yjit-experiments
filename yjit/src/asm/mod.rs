@@ -174,7 +174,6 @@ impl CodeBlock {
             CodegenGlobals::get_inline_cb().set_page(next_page_idx.unwrap(), &jmp_ptr);
         }
 
-
         !self.dropped_bytes
     }
 

@@ -745,6 +745,7 @@ fn global_allocation_size() -> usize {
 #[macro_export]
 macro_rules! gen_counter_incr {
     ($asm:expr, $counter_name:ident) => {
+        use $crate::dev::stats::ptr_to_counter;
         if (get_option!(gen_stats)) {
             // Get a pointer to the counter variable
             let ptr = ptr_to_counter!($counter_name);
@@ -762,7 +763,10 @@ macro_rules! gen_counter_incr {
 
 #[macro_export]
 macro_rules! counted_exit {
-    ($ocb:expr, $existing_side_exit:tt, $counter_name:ident) => {
+    ($ocb:expr, $existing_side_exit:tt, $counter_name:ident) => {{
+        use $crate::codegen::Assembler;
+        use $crate::dev::options::get_option;
+        use $crate::gen_counter_incr;
         // The counter is only incremented when stats are enabled
         if (!get_option!(gen_stats)) {
             $existing_side_exit
@@ -782,5 +786,5 @@ macro_rules! counted_exit {
             // Pointer to the side-exit code
             code_ptr.as_side_exit()
         }
-    };
+    }};
 }
