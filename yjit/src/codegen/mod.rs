@@ -430,7 +430,6 @@ pub fn gen_single_block(
 ) -> Result<BlockRef, ()> {
     // Limit the number of specialized versions for this block
     let ctx = limit_block_versions(blockid, start_ctx);
-    let starting_ctx = ctx.clone();
 
     verify_blockid(blockid);
     assert!(!(blockid.idx == 0 && ctx.get_stack_size() > 0));
@@ -474,6 +473,7 @@ pub fn gen_single_block(
     // For each instruction to compile
     // NOTE: could rewrite this loop with a std::iter::Iterator
     while insn_idx < iseq_size {
+        let starting_ctx = code_generator.ctx.clone();
         // Get the current pc and opcode
         let pc = unsafe { rb_iseq_pc_at_idx(iseq, insn_idx) };
         // try_into() call below is unfortunate. Maybe pick i32 instead of usize for opcodes.
