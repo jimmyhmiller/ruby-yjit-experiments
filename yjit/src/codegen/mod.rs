@@ -609,7 +609,7 @@ pub fn gen_single_block(
     Ok(blockref)
 }
 
-fn debug_record_block_comment(blockid: BlockIseqInfo, code_generator: &mut CodeGenerator) {
+fn debug_record_block_comment(blockid: BlockId, code_generator: &mut CodeGenerator) {
     #[cfg(feature = "disasm")]
     if get_option_ref!(dump_disasm).is_some() {
         let blockid_idx = blockid.idx;
