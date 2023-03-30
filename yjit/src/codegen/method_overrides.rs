@@ -1,4 +1,4 @@
-use std::sync::Once;
+
 
 use crate::{
     backend::ir::{Opnd, EC},
@@ -22,78 +22,74 @@ use crate::{
 };
 
 use super::{globals::CodegenGlobals, CodeGenerator};
-static SETUP_OVERRIDES: Once = Once::new();
-
 impl CodeGenerator {
     pub fn init_overrides(instance: &mut CodegenGlobals) {
-        SETUP_OVERRIDES.call_once(|| {
-            unsafe {
-                // Specialization for C methods. See yjit_reg_method() for details.
-                instance.yjit_reg_method(rb_cBasicObject, "!", CodeGenerator::jit_rb_obj_not);
+        unsafe {
+            // Specialization for C methods. See yjit_reg_method() for details.
+            instance.yjit_reg_method(rb_cBasicObject, "!", CodeGenerator::jit_rb_obj_not);
 
-                instance.yjit_reg_method(rb_cNilClass, "nil?", CodeGenerator::jit_rb_true);
-                instance.yjit_reg_method(rb_mKernel, "nil?", CodeGenerator::jit_rb_false);
-                instance.yjit_reg_method(rb_mKernel, "is_a?", CodeGenerator::jit_rb_kernel_is_a);
-                instance.yjit_reg_method(rb_mKernel, "kind_of?", CodeGenerator::jit_rb_kernel_is_a);
-                instance.yjit_reg_method(
-                    rb_mKernel,
-                    "instance_of?",
-                    CodeGenerator::jit_rb_kernel_instance_of,
-                );
+            instance.yjit_reg_method(rb_cNilClass, "nil?", CodeGenerator::jit_rb_true);
+            instance.yjit_reg_method(rb_mKernel, "nil?", CodeGenerator::jit_rb_false);
+            instance.yjit_reg_method(rb_mKernel, "is_a?", CodeGenerator::jit_rb_kernel_is_a);
+            instance.yjit_reg_method(rb_mKernel, "kind_of?", CodeGenerator::jit_rb_kernel_is_a);
+            instance.yjit_reg_method(
+                rb_mKernel,
+                "instance_of?",
+                CodeGenerator::jit_rb_kernel_instance_of,
+            );
 
-                instance.yjit_reg_method(rb_cBasicObject, "==", CodeGenerator::jit_rb_obj_equal);
-                instance.yjit_reg_method(
-                    rb_cBasicObject,
-                    "equal?",
-                    CodeGenerator::jit_rb_obj_equal,
-                );
-                instance.yjit_reg_method(
-                    rb_cBasicObject,
-                    "!=",
-                    CodeGenerator::jit_rb_obj_not_equal,
-                );
-                instance.yjit_reg_method(rb_mKernel, "eql?", CodeGenerator::jit_rb_obj_equal);
-                instance.yjit_reg_method(rb_cModule, "==", CodeGenerator::jit_rb_obj_equal);
-                instance.yjit_reg_method(rb_cModule, "===", CodeGenerator::jit_rb_mod_eqq);
-                instance.yjit_reg_method(rb_cSymbol, "==", CodeGenerator::jit_rb_obj_equal);
-                instance.yjit_reg_method(rb_cSymbol, "===", CodeGenerator::jit_rb_obj_equal);
-                instance.yjit_reg_method(rb_cInteger, "==", CodeGenerator::jit_rb_int_equal);
-                instance.yjit_reg_method(rb_cInteger, "===", CodeGenerator::jit_rb_int_equal);
+            instance.yjit_reg_method(rb_cBasicObject, "==", CodeGenerator::jit_rb_obj_equal);
+            instance.yjit_reg_method(
+                rb_cBasicObject,
+                "equal?",
+                CodeGenerator::jit_rb_obj_equal,
+            );
+            instance.yjit_reg_method(
+                rb_cBasicObject,
+                "!=",
+                CodeGenerator::jit_rb_obj_not_equal,
+            );
+            instance.yjit_reg_method(rb_mKernel, "eql?", CodeGenerator::jit_rb_obj_equal);
+            instance.yjit_reg_method(rb_cModule, "==", CodeGenerator::jit_rb_obj_equal);
+            instance.yjit_reg_method(rb_cModule, "===", CodeGenerator::jit_rb_mod_eqq);
+            instance.yjit_reg_method(rb_cSymbol, "==", CodeGenerator::jit_rb_obj_equal);
+            instance.yjit_reg_method(rb_cSymbol, "===", CodeGenerator::jit_rb_obj_equal);
+            instance.yjit_reg_method(rb_cInteger, "==", CodeGenerator::jit_rb_int_equal);
+            instance.yjit_reg_method(rb_cInteger, "===", CodeGenerator::jit_rb_int_equal);
 
-                // rb_str_to_s() methods in string.c
-                instance.yjit_reg_method(rb_cString, "empty?", CodeGenerator::jit_rb_str_empty_p);
-                instance.yjit_reg_method(rb_cString, "to_s", CodeGenerator::jit_rb_str_to_s);
-                instance.yjit_reg_method(rb_cString, "to_str", CodeGenerator::jit_rb_str_to_s);
-                instance.yjit_reg_method(
-                    rb_cString,
-                    "bytesize",
-                    CodeGenerator::jit_rb_str_bytesize,
-                );
-                instance.yjit_reg_method(rb_cString, "<<", CodeGenerator::jit_rb_str_concat);
-                instance.yjit_reg_method(rb_cString, "+@", CodeGenerator::jit_rb_str_uplus);
+            // rb_str_to_s() methods in string.c
+            instance.yjit_reg_method(rb_cString, "empty?", CodeGenerator::jit_rb_str_empty_p);
+            instance.yjit_reg_method(rb_cString, "to_s", CodeGenerator::jit_rb_str_to_s);
+            instance.yjit_reg_method(rb_cString, "to_str", CodeGenerator::jit_rb_str_to_s);
+            instance.yjit_reg_method(
+                rb_cString,
+                "bytesize",
+                CodeGenerator::jit_rb_str_bytesize,
+            );
+            instance.yjit_reg_method(rb_cString, "<<", CodeGenerator::jit_rb_str_concat);
+            instance.yjit_reg_method(rb_cString, "+@", CodeGenerator::jit_rb_str_uplus);
 
-                // rb_ary_empty_p() method in array.c
-                instance.yjit_reg_method(rb_cArray, "empty?", CodeGenerator::jit_rb_ary_empty_p);
+            // rb_ary_empty_p() method in array.c
+            instance.yjit_reg_method(rb_cArray, "empty?", CodeGenerator::jit_rb_ary_empty_p);
 
-                instance.yjit_reg_method(
-                    rb_mKernel,
-                    "respond_to?",
-                    CodeGenerator::jit_obj_respond_to,
-                );
-                instance.yjit_reg_method(
-                    rb_mKernel,
-                    "block_given?",
-                    CodeGenerator::jit_rb_f_block_given_p,
-                );
+            instance.yjit_reg_method(
+                rb_mKernel,
+                "respond_to?",
+                CodeGenerator::jit_obj_respond_to,
+            );
+            instance.yjit_reg_method(
+                rb_mKernel,
+                "block_given?",
+                CodeGenerator::jit_rb_f_block_given_p,
+            );
 
-                // Thread.current
-                instance.yjit_reg_method(
-                    rb_singleton_class(rb_cThread),
-                    "current",
-                    CodeGenerator::jit_thread_s_current,
-                );
-            }
-        })
+            // Thread.current
+            instance.yjit_reg_method(
+                rb_singleton_class(rb_cThread),
+                "current",
+                CodeGenerator::jit_thread_s_current,
+            );
+        }
     }
 
     // Codegen for rb_obj_not().
