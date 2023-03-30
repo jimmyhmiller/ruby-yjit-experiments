@@ -454,21 +454,7 @@ pub fn gen_single_block(
     let mut code_generator =
         CodeGenerator::new(jit, ctx, asm, CodegenGlobals::take_outlined_cb().unwrap());
 
-    #[cfg(feature = "disasm")]
-    if get_option_ref!(dump_disasm).is_some() {
-        let blockid_idx = blockid.idx;
-        let chain_depth = if code_generator.ctx.get_chain_depth() > 0 {
-            format!(", chain_depth: {}", code_generator.ctx.get_chain_depth())
-        } else {
-            "".to_string()
-        };
-        code_generator.asm.comment(&format!(
-            "Block: {} (ISEQ offset: {}{})",
-            iseq_get_location(blockid.iseq, blockid_idx),
-            blockid_idx,
-            chain_depth
-        ));
-    }
+    debug_record_block_comment(blockid, &mut code_generator);
 
     // For each instruction to compile
     // NOTE: could rewrite this loop with a std::iter::Iterator
@@ -621,6 +607,24 @@ pub fn gen_single_block(
 
     // Block compiled successfully
     Ok(blockref)
+}
+
+fn debug_record_block_comment(blockid: BlockIseqInfo, code_generator: &mut CodeGenerator) {
+    #[cfg(feature = "disasm")]
+    if get_option_ref!(dump_disasm).is_some() {
+        let blockid_idx = blockid.idx;
+        let chain_depth = if code_generator.ctx.get_chain_depth() > 0 {
+            format!(", chain_depth: {}", code_generator.ctx.get_chain_depth())
+        } else {
+            "".to_string()
+        };
+        code_generator.asm.comment(&format!(
+            "Block: {} (ISEQ offset: {}{})",
+            iseq_get_location(blockid.iseq, blockid_idx),
+            blockid_idx,
+            chain_depth
+        ));
+    }
 }
 
 pub struct CodeGenerator {
