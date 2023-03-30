@@ -745,6 +745,7 @@ fn global_allocation_size() -> usize {
 #[macro_export]
 macro_rules! gen_counter_incr {
     ($asm:expr, $counter_name:ident) => {
+        use $crate::codegen::Opnd;
         use $crate::dev::stats::ptr_to_counter;
         if (get_option!(gen_stats)) {
             // Get a pointer to the counter variable

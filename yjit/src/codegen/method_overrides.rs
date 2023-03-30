@@ -1,5 +1,3 @@
-
-
 use crate::{
     backend::ir::{Opnd, EC},
     counted_exit,
@@ -21,7 +19,9 @@ use crate::{
     },
 };
 
-use super::{globals::CodegenGlobals, CodeGenerator};
+use super::globals::CodegenGlobals;
+use crate::codegen::generator::CodeGenerator;
+
 impl CodeGenerator {
     pub fn init_overrides(instance: &mut CodegenGlobals) {
         unsafe {
@@ -39,16 +39,8 @@ impl CodeGenerator {
             );
 
             instance.yjit_reg_method(rb_cBasicObject, "==", CodeGenerator::jit_rb_obj_equal);
-            instance.yjit_reg_method(
-                rb_cBasicObject,
-                "equal?",
-                CodeGenerator::jit_rb_obj_equal,
-            );
-            instance.yjit_reg_method(
-                rb_cBasicObject,
-                "!=",
-                CodeGenerator::jit_rb_obj_not_equal,
-            );
+            instance.yjit_reg_method(rb_cBasicObject, "equal?", CodeGenerator::jit_rb_obj_equal);
+            instance.yjit_reg_method(rb_cBasicObject, "!=", CodeGenerator::jit_rb_obj_not_equal);
             instance.yjit_reg_method(rb_mKernel, "eql?", CodeGenerator::jit_rb_obj_equal);
             instance.yjit_reg_method(rb_cModule, "==", CodeGenerator::jit_rb_obj_equal);
             instance.yjit_reg_method(rb_cModule, "===", CodeGenerator::jit_rb_mod_eqq);
@@ -61,22 +53,14 @@ impl CodeGenerator {
             instance.yjit_reg_method(rb_cString, "empty?", CodeGenerator::jit_rb_str_empty_p);
             instance.yjit_reg_method(rb_cString, "to_s", CodeGenerator::jit_rb_str_to_s);
             instance.yjit_reg_method(rb_cString, "to_str", CodeGenerator::jit_rb_str_to_s);
-            instance.yjit_reg_method(
-                rb_cString,
-                "bytesize",
-                CodeGenerator::jit_rb_str_bytesize,
-            );
+            instance.yjit_reg_method(rb_cString, "bytesize", CodeGenerator::jit_rb_str_bytesize);
             instance.yjit_reg_method(rb_cString, "<<", CodeGenerator::jit_rb_str_concat);
             instance.yjit_reg_method(rb_cString, "+@", CodeGenerator::jit_rb_str_uplus);
 
             // rb_ary_empty_p() method in array.c
             instance.yjit_reg_method(rb_cArray, "empty?", CodeGenerator::jit_rb_ary_empty_p);
 
-            instance.yjit_reg_method(
-                rb_mKernel,
-                "respond_to?",
-                CodeGenerator::jit_obj_respond_to,
-            );
+            instance.yjit_reg_method(rb_mKernel, "respond_to?", CodeGenerator::jit_obj_respond_to);
             instance.yjit_reg_method(
                 rb_mKernel,
                 "block_given?",

@@ -1,25 +1,29 @@
 use crate::{
     asm::{CodeBlock, OutlinedCb},
-    backend::ir::{Assembler, Opnd, C_ARG_OPNDS, EC},
+    backend::ir::{Assembler, Opnd, CFP, C_ARG_OPNDS, EC, SP},
     bbv::{add_block_version, find_block_version, remove_block_version},
-    codegen::{gen_entry_prologue, gen_single_block, globals::CodegenGlobals, CodeGenerator},
+    codegen::{
+        gen_single_block, generator::CodeGenerator, globals::CodegenGlobals, old_gen_pc_guard,
+    },
     cruby::{
         get_cfp_pc, get_cfp_sp, get_ec_cfp, get_iseq_encoded_size, imemo_iseq, rb_IMEMO_TYPE_P,
         rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_iseq_reset_jit_func, rb_set_cfp_pc, rb_set_cfp_sp,
-        src_loc, with_vm_lock, EcPtr, IseqPtr,
+        src_loc, with_vm_lock, EcPtr, IseqPtr, RUBY_OFFSET_CFP_JIT_RETURN, RUBY_OFFSET_CFP_SP,
     },
-    dev::options::get_option,
+    dev::options::{get_option, get_option_ref},
     dev::stats::incr_counter,
-    iseq::get_iseq_payload,
+    iseq::{get_iseq_payload, get_or_create_iseq_payload},
     meta::block::{
         BlockId, BlockRef, Branch, BranchGenFn, BranchRef, BranchShape, BranchStub, BranchTarget,
     },
     meta::context::Context,
     meta::invariants::block_assumptions_free,
     meta::jit_state::JITState,
-    utils::{c_callable, IntoUsize},
+    utils::{c_callable, iseq_get_location, IntoUsize},
     virtualmem::CodePtr,
 };
+
+use crate::cruby::get_iseq_flags_has_opt;
 
 use core::ffi::c_void;
 use std::cell::{RefCell, RefMut};
@@ -128,8 +132,6 @@ pub fn gen_block_series_body(
 
     #[cfg(feature = "disasm")]
     {
-        use crate::dev::options::get_option_ref;
-        use crate::utils::iseq_get_location;
         // If dump_iseq_disasm is active, see if this iseq's location matches the given substring.
         // If so, we print the new blocks to the console.
         if let Some(substr) = get_option_ref!(dump_iseq_disasm).as_ref() {
@@ -153,6 +155,62 @@ pub fn gen_block_series_body(
     }
 
     Some(first_block)
+}
+
+/// Compile an interpreter entry block to be inserted into an iseq
+/// Returns None if compilation fails.
+pub fn gen_entry_prologue(cb: &mut CodeBlock, iseq: IseqPtr, insn_idx: u32) -> Option<CodePtr> {
+    let code_ptr = cb.get_write_ptr();
+
+    let mut asm = Assembler::new();
+    if get_option_ref!(dump_disasm).is_some() {
+        asm.comment(&format!("YJIT entry point: {}", iseq_get_location(iseq, 0)));
+    } else {
+        asm.comment("YJIT entry");
+    }
+
+    asm.frame_setup();
+
+    // Save the CFP, EC, SP registers to the C stack
+    asm.cpush(CFP);
+    asm.cpush(EC);
+    asm.cpush(SP);
+
+    // We are passed EC and CFP as arguments
+    asm.mov(EC, C_ARG_OPNDS[0]);
+    asm.mov(CFP, C_ARG_OPNDS[1]);
+
+    // Load the current SP from the CFP into REG_SP
+    asm.mov(SP, Opnd::mem(64, CFP, RUBY_OFFSET_CFP_SP));
+
+    // Setup cfp->jit_return
+    asm.mov(
+        Opnd::mem(64, CFP, RUBY_OFFSET_CFP_JIT_RETURN),
+        Opnd::const_ptr(CodegenGlobals::get_leave_exit_code().raw_ptr()),
+    );
+
+    // We're compiling iseqs that we *expect* to start at `insn_idx`. But in
+    // the case of optional parameters, the interpreter can set the pc to a
+    // different location depending on the optional parameters.  If an iseq
+    // has optional parameters, we'll add a runtime check that the PC we've
+    // compiled for is the same PC that the interpreter wants us to run with.
+    // If they don't match, then we'll take a side exit.
+    if unsafe { get_iseq_flags_has_opt(iseq) } {
+        old_gen_pc_guard(&mut asm, iseq, insn_idx);
+    }
+
+    asm.compile(cb);
+
+    if cb.has_dropped_bytes() {
+        None
+    } else {
+        // Mark code pages for code GC
+        let iseq_payload = get_or_create_iseq_payload(iseq);
+        for page in cb.addrs_to_pages(code_ptr, cb.get_write_ptr()) {
+            iseq_payload.pages.insert(page);
+        }
+        Some(code_ptr)
+    }
 }
 
 /// Generate a block version that is an entry point inserted into an iseq
@@ -747,8 +805,6 @@ pub fn invalidate_block_version(blockref: &BlockRef) {
 
     #[cfg(feature = "disasm")]
     {
-        use crate::dev::options::get_option_ref;
-        use crate::utils::iseq_get_location;
         // If dump_iseq_disasm is specified, print to console that blocks for matching ISEQ names were invalidated.
         if let Some(substr) = get_option_ref!(dump_iseq_disasm).as_ref() {
             let blockid_idx = block.blockid.idx;

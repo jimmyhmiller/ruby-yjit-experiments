@@ -2,17 +2,101 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     asm::{CodeBlock, OutlinedCb},
-    codegen::{
-        gen_code_for_exit_from_stub, gen_full_cfunc_return, gen_leave_exit, CodeGenerator, CodePtr,
-        CodepagePatch,
-    },
+    backend::ir::{Assembler, CFP, C_RET_OPND, EC, SP},
+    codegen::{CodePtr, CodepagePatch},
     core::gen_branch_stub_hit_trampoline,
     cruby::{
-        get_def_method_serial, rb_callable_method_entry_t, rb_callinfo, rb_intern,
-        rb_method_entry_at, IseqPtr, VALUE,
+        get_def_method_serial, rb_callable_method_entry_t, rb_callinfo, rb_full_cfunc_return,
+        rb_intern, rb_method_entry_at, IseqPtr, Qundef, VALUE,
     },
     dev::options::get_option,
+    gen_counter_incr,
 };
+
+// This is only called in global when are setting up globals. Where does it belong?
+// Fill code_for_exit_from_stub. This is used by branch_stub_hit() to exit
+// to the interpreter when it cannot service a stub by generating new code.
+// Before coming here, branch_stub_hit() takes care of fully reconstructing
+// interpreter state.
+fn gen_code_for_exit_from_stub(ocb: &mut OutlinedCb) -> CodePtr {
+    let ocb = ocb.unwrap();
+    let code_ptr = ocb.get_write_ptr();
+    let mut asm = Assembler::new();
+
+    gen_counter_incr!(&mut asm, exit_from_branch_stub);
+
+    asm.comment("exit from branch stub");
+    asm.cpop_into(SP);
+    asm.cpop_into(EC);
+    asm.cpop_into(CFP);
+
+    asm.frame_teardown();
+
+    asm.cret(Qundef.into());
+
+    asm.compile(ocb);
+
+    code_ptr
+}
+
+// Landing code for when c_return tracing is enabled. See full_cfunc_return().
+fn gen_full_cfunc_return(ocb: &mut OutlinedCb) -> CodePtr {
+    let ocb = ocb.unwrap();
+    let code_ptr = ocb.get_write_ptr();
+    let mut asm = Assembler::new();
+
+    // This chunk of code expects REG_EC to be filled properly and
+    // RAX to contain the return value of the C method.
+
+    asm.comment("full cfunc return");
+    asm.ccall(rb_full_cfunc_return as *const u8, vec![EC, C_RET_OPND]);
+
+    // Count the exit
+    gen_counter_incr!(asm, traced_cfunc_return);
+
+    // Return to the interpreter
+    asm.cpop_into(SP);
+    asm.cpop_into(EC);
+    asm.cpop_into(CFP);
+
+    asm.frame_teardown();
+
+    asm.cret(Qundef.into());
+
+    asm.compile(ocb);
+
+    code_ptr
+}
+
+/// Generate a continuation for leave that exits to the interpreter at REG_CFP->pc.
+/// This is used by gen_leave() and gen_entry_prologue()
+pub fn gen_leave_exit(ocb: &mut OutlinedCb) -> CodePtr {
+    let ocb = ocb.unwrap();
+    let code_ptr = ocb.get_write_ptr();
+    let mut asm = Assembler::new();
+
+    // gen_leave() fully reconstructs interpreter state and leaves the
+    // return value in C_RET_OPND before coming here.
+    let ret_opnd = asm.live_reg_opnd(C_RET_OPND);
+
+    // Every exit to the interpreter should be counted
+    gen_counter_incr!(asm, leave_interp_return);
+
+    asm.comment("exit from leave");
+    asm.cpop_into(SP);
+    asm.cpop_into(EC);
+    asm.cpop_into(CFP);
+
+    asm.frame_teardown();
+
+    asm.cret(ret_opnd);
+
+    asm.compile(ocb);
+
+    code_ptr
+}
+
+use super::generator::CodeGenerator;
 
 // Return true when the codegen function generates code.
 // known_recv_klass is non-NULL when the caller has used jit_guard_known_klass().
