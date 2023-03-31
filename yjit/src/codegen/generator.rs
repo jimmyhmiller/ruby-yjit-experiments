@@ -1,10 +1,14 @@
 // We use the YARV bytecode constants which have a CRuby-style name
 #![allow(non_upper_case_globals)]
 
+use std::mem;
 use std::os::raw::c_int;
 use std::ptr;
 use std::slice;
 
+use crate::asm::CodeBlock;
+use crate::bbv::limit_block_versions;
+use crate::meta::block::Block;
 use crate::meta::context::YARVOpnd;
 pub use crate::virtualmem::CodePtr;
 use crate::{
@@ -93,10 +97,7 @@ use crate::{
     utils::IntoUsize,
 };
 
-use super::{
-    c_method_tracing_currently_enabled, lookup_cfunc_codegen, CmovFn, ControlFrame, JCCKinds,
-    SpecVal,
-};
+use super::{c_method_tracing_currently_enabled, lookup_cfunc_codegen, CmovFn, JCCKinds};
 
 use crate::codegen::{build_kwhash, JCCKinds::*};
 
@@ -133,9 +134,54 @@ pub struct CodeGenerator {
     pub ocb: OutlinedCb,
 }
 
+// SpecVal is a single value in an iseq invocation's environment on the stack,
+// at sp[-2]. Depending on the frame type, it can serve different purposes,
+// which are covered here by enum variants.
+enum SpecVal {
+    None,
+    BlockISeq(IseqPtr),
+    BlockParamProxy,
+    PrevEP(*const VALUE),
+    PrevEPOpnd(Opnd),
+}
+
+pub struct ControlFrame {
+    recv: Opnd,
+    sp: Opnd,
+    iseq: Option<IseqPtr>,
+    pc: Option<u64>,
+    frame_type: u32,
+    specval: SpecVal,
+    cme: *const rb_callable_method_entry_t,
+    local_size: i32,
+}
+
 impl CodeGenerator {
     pub fn new(jit: JITState, ctx: Context, asm: Assembler, ocb: OutlinedCb) -> Self {
         Self { jit, ctx, asm, ocb }
+    }
+
+    pub fn init(
+        blockid: BlockId,
+        start_ctx: &Context,
+        cb: &mut CodeBlock,
+        ec: *const crate::cruby::rb_execution_context_struct,
+    ) -> Self {
+        // Limit the number of specialized versions for this block
+        let ctx = limit_block_versions(blockid, start_ctx);
+
+        // Allocate the new block
+        let blockref = Block::make_ref(blockid, &ctx, cb.get_write_ptr());
+
+        // Initialize a JIT state object
+        let mut jit = JITState::new(&blockref);
+        jit.iseq = blockid.iseq;
+        jit.ec = Some(ec);
+
+        // Create a backend assembler instance
+        let asm = Assembler::new();
+
+        Self::new(jit, ctx, asm, CodegenGlobals::take_outlined_cb().unwrap())
     }
 
     pub fn get_ocb(&mut self) -> &mut OutlinedCb {
@@ -5652,5 +5698,17 @@ impl CodeGenerator {
             }
             Some(code_ptr) => code_ptr.as_side_exit(),
         }
+    }
+
+    pub fn swap_asm(&mut self) -> Assembler {
+        let new_asm = Assembler::new();
+        let old_asm = mem::replace(&mut self.asm, new_asm);
+        old_asm
+    }
+
+    pub(crate) fn swap_ocb(&mut self) -> OutlinedCb {
+        let new_ocb = OutlinedCb::Dummy;
+        let old_ocb = mem::replace(&mut self.ocb, new_ocb);
+        old_ocb
     }
 }

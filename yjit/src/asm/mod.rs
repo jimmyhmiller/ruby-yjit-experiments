@@ -788,18 +788,24 @@ impl fmt::LowerHex for CodeBlock {
 
 /// Wrapper struct so we can use the type system to distinguish
 /// Between the inlined and outlined code blocks
-pub struct OutlinedCb {
-    // This must remain private
-    cb: CodeBlock,
+pub enum OutlinedCb {
+    Dummy,
+    Real {
+        // This must remain private
+        cb: CodeBlock,
+    },
 }
 
 impl OutlinedCb {
     pub fn wrap(cb: CodeBlock) -> Self {
-        OutlinedCb { cb }
+        OutlinedCb::Real { cb }
     }
 
     pub fn unwrap(&mut self) -> &mut CodeBlock {
-        &mut self.cb
+        match self {
+            OutlinedCb::Dummy => panic!("This is a dummy ocb"),
+            OutlinedCb::Real { cb } => cb,
+        }
     }
 }
 

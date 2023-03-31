@@ -13,10 +13,10 @@ use crate::{
     core::{free_block, verify_blockid},
     cruby::{
         get_cikw_keyword_len, get_cikw_keywords_idx, get_def_method_serial, get_iseq_encoded_size,
-        insn_len, insn_name, rb_c_method_tracing_currently_enabled, rb_callable_method_entry_t,
-        rb_callinfo, rb_execution_context_struct, rb_hash_aset, rb_hash_new_with_size,
-        rb_iseq_opcode_at_pc, rb_iseq_pc_at_idx, rb_method_definition_t, vm_ci_kwarg, EcPtr,
-        IseqPtr, Qundef, YARVINSN_opt_getconstant_path, RUBY_OFFSET_CFP_PC, RUBY_OFFSET_CFP_SP,
+        insn_len, insn_name, rb_c_method_tracing_currently_enabled, rb_callinfo,
+        rb_execution_context_struct, rb_hash_aset, rb_hash_new_with_size, rb_iseq_opcode_at_pc,
+        rb_iseq_pc_at_idx, rb_method_definition_t, vm_ci_kwarg, EcPtr, IseqPtr, Qundef,
+        YARVINSN_opt_getconstant_path, RUBY_OFFSET_CFP_PC, RUBY_OFFSET_CFP_SP,
         RUBY_OFFSET_EC_INTERRUPT_FLAG, VALUE,
     },
     dev::{
@@ -55,7 +55,6 @@ pub enum JCCKinds {
 // Trying to move things so they are in places that make sense.
 // Eventually we will get to a point where entry is just getting
 // some struct a calling a method on it.
-
 
 impl CodeGenerator {
     // Save the incremented PC on the CFP
@@ -179,214 +178,201 @@ impl CodeGenerator {
 
         self.asm.jnz(side_exit);
     }
-}
 
-// Compile a sequence of bytecode instructions for a given basic block version.
-// Part of gen_block_version().
-// Note: this function will mutate its context while generating code,
-//       but the input start_ctx argument should remain immutable.
-pub fn gen_single_block(
-    blockid: BlockId,
-    start_ctx: &Context,
-    ec: EcPtr,
-    cb: &mut CodeBlock,
-) -> Result<BlockRef, ()> {
-    // Limit the number of specialized versions for this block
-    let ctx = limit_block_versions(blockid, start_ctx);
+    // Compile a sequence of bytecode instructions for a given basic block version.
+    // Part of gen_block_version().
+    // Note: this function will mutate its context while generating code,
+    //       but the input start_ctx argument should remain immutable.
+    pub fn gen_single_block(
+        &mut self,
+        blockid: BlockId,
+        start_ctx: &Context,
+        ec: EcPtr,
+        cb: &mut CodeBlock,
+    ) -> Result<BlockRef, ()> {
+        // Limit the number of specialized versions for this block
+        let ctx = limit_block_versions(blockid, start_ctx);
 
-    verify_blockid(blockid);
-    assert!(!(blockid.idx == 0 && ctx.get_stack_size() > 0));
+        verify_blockid(blockid);
+        assert!(!(blockid.idx == 0 && ctx.get_stack_size() > 0));
 
-    // Instruction sequence to compile
-    let iseq = blockid.iseq;
-    let iseq_size = unsafe { get_iseq_encoded_size(iseq) };
-    let mut insn_idx: c_uint = blockid.idx;
-    let starting_insn_idx = insn_idx;
+        // Instruction sequence to compile
+        let iseq = blockid.iseq;
+        let iseq_size = unsafe { get_iseq_encoded_size(iseq) };
+        let mut insn_idx: c_uint = blockid.idx;
+        let starting_insn_idx = insn_idx;
 
-    // Allocate the new block
-    let blockref = Block::make_ref(blockid, &ctx, cb.get_write_ptr());
+        // Allocate the new block
+        let blockref = Block::make_ref(blockid, &ctx, cb.get_write_ptr());
 
-    // Initialize a JIT state object
-    let mut jit = JITState::new(&blockref);
-    jit.iseq = blockid.iseq;
-    jit.ec = Some(ec);
+        // TODO: Probably don't need to do this.
+        // Initialize a JIT state object
+        let mut jit = JITState::new(&blockref);
+        jit.iseq = blockid.iseq;
+        jit.ec = Some(ec);
+        self.jit = jit;
 
-    // Create a backend assembler instance
-    let asm = Assembler::new();
+        self.debug_record_block_comment(blockid);
 
-    let mut code_generator =
-        CodeGenerator::new(jit, ctx, asm, CodegenGlobals::take_outlined_cb().unwrap());
+        // For each instruction to compile
+        // NOTE: could rewrite this loop with a std::iter::Iterator
+        while insn_idx < iseq_size {
+            let starting_ctx = self.ctx.clone();
+            // Get the current pc and opcode
+            let pc = unsafe { rb_iseq_pc_at_idx(iseq, insn_idx) };
+            // try_into() call below is unfortunate. Maybe pick i32 instead of usize for opcodes.
+            let opcode: usize = unsafe { rb_iseq_opcode_at_pc(iseq, pc) }
+                .try_into()
+                .unwrap();
 
-    debug_record_block_comment(blockid, &mut code_generator);
+            // We need opt_getconstant_path to be in a block all on its own. Cut the block short
+            // if we run into it. This is necessary because we want to invalidate based on the
+            // instruction's index.
+            if opcode == YARVINSN_opt_getconstant_path.into_usize() && insn_idx > starting_insn_idx
+            {
+                // TODO: JIMMY Need a code generator
+                self.jump_to_next_insn();
+                break;
+            }
 
-    // For each instruction to compile
-    // NOTE: could rewrite this loop with a std::iter::Iterator
-    while insn_idx < iseq_size {
-        let starting_ctx = code_generator.ctx.clone();
-        // Get the current pc and opcode
-        let pc = unsafe { rb_iseq_pc_at_idx(iseq, insn_idx) };
-        // try_into() call below is unfortunate. Maybe pick i32 instead of usize for opcodes.
-        let opcode: usize = unsafe { rb_iseq_opcode_at_pc(iseq, pc) }
-            .try_into()
-            .unwrap();
+            // Set the current instruction
+            self.jit.insn_idx = insn_idx;
+            self.jit.opcode = opcode;
+            self.jit.pc = pc;
+            self.jit.side_exit_for_pc = None;
 
-        // We need opt_getconstant_path to be in a block all on its own. Cut the block short
-        // if we run into it. This is necessary because we want to invalidate based on the
-        // instruction's index.
-        if opcode == YARVINSN_opt_getconstant_path.into_usize() && insn_idx > starting_insn_idx {
-            // TODO: JIMMY Need a code generator
-            code_generator.jump_to_next_insn();
-            break;
+            // If previous instruction requested to record the boundary
+            if self.jit.record_boundary_patch_point {
+                // Generate an exit to this instruction and record it
+                let exit_pos = old_gen_outlined_exit(self.jit.pc, &self.ctx, &mut self.ocb);
+                old_record_global_inval_patch(&mut self.asm, exit_pos);
+                self.jit.record_boundary_patch_point = false;
+            }
+
+            // In debug mode, verify our existing assumption
+            if cfg!(debug_assertions) && get_option!(verify_ctx) && self.jit.at_current_insn() {
+                verify_ctx(&self.jit, &self.ctx);
+            }
+
+            // Lookup the codegen function for this instruction
+            let mut status = CodegenStatus::CantCompile;
+            if let Some(gen_fn) = get_gen_fn(VALUE(opcode)) {
+                // :count-placement:
+                // Count bytecode instructions that execute in generated code.
+                // Note that the increment happens even when the output takes side exit.
+                gen_counter_incr!(self.asm, exec_instruction);
+
+                // Add a comment for the name of the YARV instruction
+                self.asm.comment(&format!("Insn: {}", insn_name(opcode)));
+
+                // If requested, dump instructions for debugging
+                if get_option!(dump_insns) {
+                    println!("compiling {}", insn_name(opcode));
+                    print_str(&mut self.asm, &format!("executing {}", insn_name(opcode)));
+                }
+
+                // Call the code generation function
+                status = gen_fn(self);
+            }
+
+            // If we can't compile this instruction
+            // exit to the interpreter and stop compiling
+            if status == CodegenStatus::CantCompile {
+                if get_option!(dump_insns) {
+                    println!("can't compile {}", insn_name(opcode));
+                }
+
+                let mut block = self.jit.block.borrow_mut();
+
+                // We are using starting_ctx so that if code_generator.ctx got mutated
+                // it won't matter. If you write to the stack to you could still get errors,
+                // but not from simple push and pops
+                old_gen_exit(self.jit.pc, &starting_ctx, &mut self.asm);
+
+                // If this is the first instruction in the block, then we can use
+                // the exit for block->entry_exit.
+                if insn_idx == block.get_blockid().idx {
+                    block.entry_exit = Some(block.get_start_addr());
+                }
+
+                break;
+            }
+
+            // For now, reset the chain depth after each instruction as only the
+            // first instruction in the block can concern itself with the depth.
+            self.ctx.reset_chain_depth();
+
+            // Move to the next instruction to compile
+            insn_idx += insn_len(opcode);
+
+            // If the instruction terminates this block
+            if status == CodegenStatus::EndBlock {
+                break;
+            }
         }
 
-        // Set the current instruction
-        code_generator.jit.insn_idx = insn_idx;
-        code_generator.jit.opcode = opcode;
-        code_generator.jit.pc = pc;
-        code_generator.jit.side_exit_for_pc = None;
-
-        // If previous instruction requested to record the boundary
-        if code_generator.jit.record_boundary_patch_point {
-            // Generate an exit to this instruction and record it
-            let exit_pos = old_gen_outlined_exit(
-                code_generator.jit.pc,
-                &code_generator.ctx,
-                &mut code_generator.ocb,
-            );
-            old_record_global_inval_patch(&mut code_generator.asm, exit_pos);
-            code_generator.jit.record_boundary_patch_point = false;
-        }
-
-        // In debug mode, verify our existing assumption
-        if cfg!(debug_assertions) && get_option!(verify_ctx) && code_generator.jit.at_current_insn()
+        // Finish filling out the block
         {
-            verify_ctx(&code_generator.jit, &code_generator.ctx);
-        }
+            let ocb = self.swap_ocb();
+            CodegenGlobals::set_outlined_cb(ocb);
 
-        // Lookup the codegen function for this instruction
-        let mut status = CodegenStatus::CantCompile;
-        if let Some(gen_fn) = get_gen_fn(VALUE(opcode)) {
-            // :count-placement:
-            // Count bytecode instructions that execute in generated code.
-            // Note that the increment happens even when the output takes side exit.
-            gen_counter_incr!(code_generator.asm, exec_instruction);
-
-            // Add a comment for the name of the YARV instruction
-            code_generator
-                .asm
-                .comment(&format!("Insn: {}", insn_name(opcode)));
-
-            // If requested, dump instructions for debugging
-            if get_option!(dump_insns) {
-                println!("compiling {}", insn_name(opcode));
-                print_str(
-                    &mut code_generator.asm,
-                    &format!("executing {}", insn_name(opcode)),
-                );
+            let asm = self.swap_asm();
+            let mut block = self.jit.block.borrow_mut();
+            if block.entry_exit.is_some() {
+                self.asm.pad_inval_patch();
             }
 
-            // Call the code generation function
-            status = gen_fn(&mut code_generator);
+            // Compile code into the code block
+            let gc_offsets = asm.compile(cb);
+
+            // Add the GC offsets to the block
+            block.set_gc_obj_offsets(gc_offsets);
+
+            // Set CME dependencies to the block
+            block.set_cme_dependencies(&self.jit.cme_dependencies);
+
+            // Set outgoing branches to the block
+            block.set_outgoing(&self.jit.outgoing);
+
+            // Mark the end position of the block
+            block.set_end_addr(cb.get_write_ptr());
+
+            // Store the index of the last instruction in the block
+            block.set_end_idx(insn_idx);
         }
 
-        // If we can't compile this instruction
-        // exit to the interpreter and stop compiling
-        if status == CodegenStatus::CantCompile {
-            if get_option!(dump_insns) {
-                println!("can't compile {}", insn_name(opcode));
-            }
+        // We currently can't handle cases where the request is for a block that
+        // doesn't go to the next instruction.
+        assert!(!self.jit.record_boundary_patch_point);
 
-            let mut block = code_generator.jit.block.borrow_mut();
-
-            // We are using starting_ctx so that if code_generator.ctx got mutated
-            // it won't matter. If you write to the stack to you could still get errors,
-            // but not from simple push and pops
-            old_gen_exit(
-                code_generator.jit.pc,
-                &starting_ctx,
-                &mut code_generator.asm,
-            );
-
-            // If this is the first instruction in the block, then we can use
-            // the exit for block->entry_exit.
-            if insn_idx == block.get_blockid().idx {
-                block.entry_exit = Some(block.get_start_addr());
-            }
-
-            break;
+        let ocb_dropped_bytes =
+            CodegenGlobals::map_outlined_cb(|ocb| ocb.unwrap().has_dropped_bytes()).unwrap();
+        // If code for the block doesn't fit, fail
+        if cb.has_dropped_bytes() || ocb_dropped_bytes {
+            free_block(&blockref);
+            return Err(());
         }
 
-        // For now, reset the chain depth after each instruction as only the
-        // first instruction in the block can concern itself with the depth.
-        code_generator.ctx.reset_chain_depth();
-
-        // Move to the next instruction to compile
-        insn_idx += insn_len(opcode);
-
-        // If the instruction terminates this block
-        if status == CodegenStatus::EndBlock {
-            break;
-        }
+        // Block compiled successfully
+        Ok(blockref)
     }
-
-    // Finish filling out the block
-    {
-        CodegenGlobals::set_outlined_cb(code_generator.ocb);
-        let mut block = code_generator.jit.block.borrow_mut();
-        if block.entry_exit.is_some() {
-            code_generator.asm.pad_inval_patch();
-        }
-
-        // Compile code into the code block
-        let gc_offsets = code_generator.asm.compile(cb);
-
-        // Add the GC offsets to the block
-        block.set_gc_obj_offsets(gc_offsets);
-
-        // Set CME dependencies to the block
-        block.set_cme_dependencies(code_generator.jit.cme_dependencies);
-
-        // Set outgoing branches to the block
-        block.set_outgoing(code_generator.jit.outgoing);
-
-        // Mark the end position of the block
-        block.set_end_addr(cb.get_write_ptr());
-
-        // Store the index of the last instruction in the block
-        block.set_end_idx(insn_idx);
-    }
-
-    // We currently can't handle cases where the request is for a block that
-    // doesn't go to the next instruction.
-    assert!(!code_generator.jit.record_boundary_patch_point);
-
-    let ocb_dropped_bytes =
-        CodegenGlobals::map_outlined_cb(|ocb| ocb.unwrap().has_dropped_bytes()).unwrap();
-    // If code for the block doesn't fit, fail
-    if cb.has_dropped_bytes() || ocb_dropped_bytes {
-        free_block(&blockref);
-        return Err(());
-    }
-
-    // Block compiled successfully
-    Ok(blockref)
 }
 
-fn debug_record_block_comment(blockid: BlockId, code_generator: &mut CodeGenerator) {
-    #[cfg(feature = "disasm")]
-    if get_option_ref!(dump_disasm).is_some() {
-        let blockid_idx = blockid.idx;
-        let chain_depth = if code_generator.ctx.get_chain_depth() > 0 {
-            format!(", chain_depth: {}", code_generator.ctx.get_chain_depth())
-        } else {
-            "".to_string()
-        };
-        code_generator.asm.comment(&format!(
-            "Block: {} (ISEQ offset: {}{})",
-            iseq_get_location(blockid.iseq, blockid_idx),
-            blockid_idx,
-            chain_depth
-        ));
+impl CodeGenerator {
+    fn debug_record_block_comment(&mut self, blockid: BlockId) {
+        #[cfg(feature = "disasm")]
+        if let Some(_) = get_option_ref!(dump_disasm) {
+            let blockid_idx = blockid.idx;
+            let chain_depth = match self.ctx.get_chain_depth() {
+                0 => String::new(),
+                depth => format!(", chain_depth: {}", depth),
+            };
+            let location = iseq_get_location(blockid.iseq, blockid_idx);
+            self.asm.comment(&format!(
+                "Block: {} (ISEQ offset: {}{})",
+                location, blockid_idx, chain_depth
+            ));
+        }
     }
 }
 
@@ -527,28 +513,6 @@ unsafe extern "C" fn build_kwhash(ci: *const rb_callinfo, sp: *const VALUE) -> V
         rb_hash_aset(hash, key, val);
     }
     hash
-}
-
-// SpecVal is a single value in an iseq invocation's environment on the stack,
-// at sp[-2]. Depending on the frame type, it can serve different purposes,
-// which are covered here by enum variants.
-enum SpecVal {
-    None,
-    BlockISeq(IseqPtr),
-    BlockParamProxy,
-    PrevEP(*const VALUE),
-    PrevEPOpnd(Opnd),
-}
-
-pub struct ControlFrame {
-    recv: Opnd,
-    sp: Opnd,
-    iseq: Option<IseqPtr>,
-    pc: Option<u64>,
-    frame_type: u32,
-    specval: SpecVal,
-    cme: *const rb_callable_method_entry_t,
-    local_size: i32,
 }
 
 // Conditional move operation used by comparison operators

@@ -2,9 +2,7 @@ use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, CFP, C_ARG_OPNDS, EC, SP},
     bbv::{add_block_version, find_block_version, remove_block_version},
-    codegen::{
-        gen_single_block, generator::CodeGenerator, globals::CodegenGlobals, old_gen_pc_guard,
-    },
+    codegen::{generator::CodeGenerator, globals::CodegenGlobals, old_gen_pc_guard},
     cruby::{
         get_cfp_pc, get_cfp_sp, get_ec_cfp, get_iseq_encoded_size, imemo_iseq, rb_IMEMO_TYPE_P,
         rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_iseq_reset_jit_func, rb_set_cfp_pc, rb_set_cfp_sp,
@@ -60,8 +58,12 @@ pub fn gen_block_series_body(
     const EXPECTED_BATCH_SIZE: usize = 4;
     let mut batch = Vec::with_capacity(EXPECTED_BATCH_SIZE);
 
+    let mut code_generator = CodeGenerator::init(blockid, start_ctx, cb, ec);
+
     // Generate code for the first block
-    let first_block = gen_single_block(blockid, start_ctx, ec, cb).ok()?;
+    let first_block = code_generator
+        .gen_single_block(blockid, start_ctx, ec, cb)
+        .ok()?;
     batch.push(first_block.clone()); // Keep track of this block version
 
     // Add the block version to the VersionMap for this ISEQ
@@ -95,8 +97,10 @@ pub fn gen_block_series_body(
         let requested_blockid = last_target.get_blockid();
         let requested_ctx = last_target.get_ctx();
 
+        let mut code_generator = CodeGenerator::init(requested_blockid, &requested_ctx, cb, ec);
+
         // Generate new block using context from the last branch.
-        let result = gen_single_block(requested_blockid, &requested_ctx, ec, cb);
+        let result = code_generator.gen_single_block(requested_blockid, &requested_ctx, ec, cb);
 
         // If the block failed to compile
         if result.is_err() {
