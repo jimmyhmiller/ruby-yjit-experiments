@@ -3,7 +3,7 @@ use std::{collections::HashMap, mem};
 use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, CFP, C_RET_OPND, EC, SP},
-    codegen::{CodePtr, CodepagePatch},
+    codegen::CodePtr,
     core::gen_branch_stub_hit_trampoline,
     cruby::{
         get_def_method_serial, rb_callable_method_entry_t, rb_callinfo, rb_full_cfunc_return,
@@ -94,6 +94,14 @@ pub fn gen_leave_exit(ocb: &mut OutlinedCb) -> CodePtr {
     asm.compile(ocb);
 
     code_ptr
+}
+
+/// For implementing global code invalidation. A position in the inline
+/// codeblock to patch into a JMP rel32 which jumps into some code in
+/// the outlined codeblock to exit to the interpreter.
+pub struct CodepagePatch {
+    pub inline_patch_pos: CodePtr,
+    pub outlined_target_pos: CodePtr,
 }
 
 use super::generator::CodeGenerator;

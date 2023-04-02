@@ -97,9 +97,24 @@ use crate::{
     utils::IntoUsize,
 };
 
-use super::{c_method_tracing_currently_enabled, lookup_cfunc_codegen, CmovFn, JCCKinds};
+use super::{c_method_tracing_currently_enabled, lookup_cfunc_codegen};
 
-use crate::codegen::{build_kwhash, JCCKinds::*};
+// Conditional move operation used by comparison operators
+type CmovFn = fn(cb: &mut Assembler, opnd0: Opnd, opnd1: Opnd) -> Opnd;
+
+
+pub enum JumpCondition {
+    NotEqual,
+    NotZero,
+    Zero,
+    Equal,
+    #[allow(unused)]
+    BelowEqual, // Unsigned
+    #[allow(unused)]
+    NotAbove, // Unsigned
+}
+
+use crate::codegen::build_kwhash;
 
 // up to 5 different classes, and embedded or not for each
 pub const GET_IVAR_MAX_DEPTH: i32 = 10;
@@ -1109,14 +1124,14 @@ impl CodeGenerator {
     fn jit_chain_guard(
         &mut self,
         ctx: &Context,
-        jcc: JCCKinds,
+        jcc: JumpCondition,
         depth_limit: i32,
         side_exit: Target,
     ) {
         let target0_gen_fn = match jcc {
-            JCC_JNE | JCC_JNZ => BranchGenFn::JNZToTarget0,
-            JCC_JZ | JCC_JE => BranchGenFn::JZToTarget0,
-            JCC_JBE | JCC_JNA => BranchGenFn::JBEToTarget0,
+            JumpCondition::NotEqual | JumpCondition::NotZero => BranchGenFn::JNZToTarget0,
+            JumpCondition::Zero | JumpCondition::Equal => BranchGenFn::JZToTarget0,
+            JumpCondition::BelowEqual | JumpCondition::NotAbove => BranchGenFn::JBEToTarget0,
         };
 
         if (ctx.get_chain_depth() as i32) < depth_limit {
@@ -1270,7 +1285,7 @@ impl CodeGenerator {
         let megamorphic_side_exit = counted_exit!(self.get_ocb(), side_exit, getivar_megamorphic);
         self.jit_chain_guard(
             &starting_context,
-            JCC_JNE,
+            JumpCondition::NotEqual,
             max_chain_depth,
             megamorphic_side_exit,
         );
@@ -1480,7 +1495,7 @@ impl CodeGenerator {
                 counted_exit!(self.get_ocb(), side_exit, setivar_megamorphic);
             self.jit_chain_guard(
                 &starting_context,
-                JCC_JNE,
+                JumpCondition::NotEqual,
                 SET_IVAR_MAX_DEPTH,
                 megamorphic_side_exit,
             );
@@ -1737,13 +1752,23 @@ impl CodeGenerator {
             self.asm.comment("guard arg0 fixnum");
             self.asm.test(arg0, Opnd::UImm(RUBY_FIXNUM_FLAG as u64));
 
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JZ, SEND_MAX_DEPTH, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::Zero,
+                SEND_MAX_DEPTH,
+                side_exit,
+            );
         }
         if arg1_type != Type::Fixnum {
             self.asm.comment("guard arg1 fixnum");
             self.asm.test(arg1, Opnd::UImm(RUBY_FIXNUM_FLAG as u64));
 
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JZ, SEND_MAX_DEPTH, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::Zero,
+                SEND_MAX_DEPTH,
+                side_exit,
+            );
         }
 
         // Set stack types in context
@@ -2504,7 +2529,12 @@ impl CodeGenerator {
             // Check if the key is the same value
             self.asm.cmp(key_opnd, comptime_key.into());
             let side_exit = self.get_side_exit(&starting_context);
-            self.jit_chain_guard(&starting_context, JCC_JNE, CASE_WHEN_MAX_DEPTH, side_exit);
+            self.jit_chain_guard(
+                &starting_context,
+                JumpCondition::NotEqual,
+                CASE_WHEN_MAX_DEPTH,
+                side_exit,
+            );
 
             // Get the offset for the compile-time key
             let mut offset = 0;
@@ -2715,7 +2745,12 @@ impl CodeGenerator {
 
             self.asm.comment("guard object is nil");
             self.asm.cmp(obj_opnd, Qnil.into());
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JNE, max_chain_depth, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::NotEqual,
+                max_chain_depth,
+                side_exit,
+            );
 
             self.ctx.upgrade_opnd_type(insn_opnd, Type::Nil);
         } else if unsafe { known_klass == rb_cTrueClass } {
@@ -2724,7 +2759,12 @@ impl CodeGenerator {
 
             self.asm.comment("guard object is true");
             self.asm.cmp(obj_opnd, Qtrue.into());
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JNE, max_chain_depth, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::NotEqual,
+                max_chain_depth,
+                side_exit,
+            );
 
             self.ctx.upgrade_opnd_type(insn_opnd, Type::True);
         } else if unsafe { known_klass == rb_cFalseClass } {
@@ -2734,7 +2774,12 @@ impl CodeGenerator {
             self.asm.comment("guard object is false");
             assert!(Qfalse.as_i32() == 0);
             self.asm.test(obj_opnd, obj_opnd);
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JNZ, max_chain_depth, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::NotZero,
+                max_chain_depth,
+                side_exit,
+            );
 
             self.ctx.upgrade_opnd_type(insn_opnd, Type::False);
         } else if unsafe { known_klass == rb_cInteger } && sample_instance.fixnum_p() {
@@ -2744,7 +2789,12 @@ impl CodeGenerator {
 
             self.asm.comment("guard object is fixnum");
             self.asm.test(obj_opnd, Opnd::Imm(RUBY_FIXNUM_FLAG as i64));
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JZ, max_chain_depth, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::Zero,
+                max_chain_depth,
+                side_exit,
+            );
             self.ctx.upgrade_opnd_type(insn_opnd, Type::Fixnum);
         } else if unsafe { known_klass == rb_cSymbol } && sample_instance.static_sym_p() {
             assert!(!val_type.is_heap());
@@ -2762,7 +2812,12 @@ impl CodeGenerator {
                     obj_opnd.with_num_bits(8).unwrap(),
                     Opnd::UImm(RUBY_SYMBOL_FLAG as u64),
                 );
-                self.jit_chain_guard(&self.ctx.clone(), JCC_JNE, max_chain_depth, side_exit);
+                self.jit_chain_guard(
+                    &self.ctx.clone(),
+                    JumpCondition::NotEqual,
+                    max_chain_depth,
+                    side_exit,
+                );
                 self.ctx.upgrade_opnd_type(insn_opnd, Type::ImmSymbol);
             }
         } else if unsafe { known_klass == rb_cFloat } && sample_instance.flonum_p() {
@@ -2774,7 +2829,12 @@ impl CodeGenerator {
                 self.asm.comment("guard object is flonum");
                 let flag_bits = self.asm.and(obj_opnd, Opnd::UImm(RUBY_FLONUM_MASK as u64));
                 self.asm.cmp(flag_bits, Opnd::UImm(RUBY_FLONUM_FLAG as u64));
-                self.jit_chain_guard(&self.ctx.clone(), JCC_JNE, max_chain_depth, side_exit);
+                self.jit_chain_guard(
+                    &self.ctx.clone(),
+                    JumpCondition::NotEqual,
+                    max_chain_depth,
+                    side_exit,
+                );
                 self.ctx.upgrade_opnd_type(insn_opnd, Type::Flonum);
             }
         } else if unsafe {
@@ -2793,7 +2853,12 @@ impl CodeGenerator {
             // this situation.
             self.asm.comment("guard known object with singleton class");
             self.asm.cmp(obj_opnd, sample_instance.into());
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JNE, max_chain_depth, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::NotEqual,
+                max_chain_depth,
+                side_exit,
+            );
         } else if val_type == Type::CString && unsafe { known_klass == rb_cString } {
             // guard elided because the context says we've already checked
             unsafe {
@@ -2811,9 +2876,19 @@ impl CodeGenerator {
             if !val_type.is_heap() {
                 self.asm.comment("guard not immediate");
                 self.asm.test(obj_opnd, (RUBY_IMMEDIATE_MASK as u64).into());
-                self.jit_chain_guard(&self.ctx.clone(), JCC_JNZ, max_chain_depth, side_exit);
+                self.jit_chain_guard(
+                    &self.ctx.clone(),
+                    JumpCondition::NotZero,
+                    max_chain_depth,
+                    side_exit,
+                );
                 self.asm.cmp(obj_opnd, Qfalse.into());
-                self.jit_chain_guard(&self.ctx.clone(), JCC_JE, max_chain_depth, side_exit);
+                self.jit_chain_guard(
+                    &self.ctx.clone(),
+                    JumpCondition::Equal,
+                    max_chain_depth,
+                    side_exit,
+                );
 
                 self.ctx.upgrade_opnd_type(insn_opnd, Type::UnknownHeap);
             }
@@ -2829,7 +2904,12 @@ impl CodeGenerator {
             // TODO: self.jit_mov_gc_ptr keeps a strong reference, which leaks the class.
             self.asm.comment("guard known class");
             self.asm.cmp(klass_opnd, known_klass.into());
-            self.jit_chain_guard(&self.ctx.clone(), JCC_JNE, max_chain_depth, side_exit);
+            self.jit_chain_guard(
+                &self.ctx.clone(),
+                JumpCondition::NotEqual,
+                max_chain_depth,
+                side_exit,
+            );
 
             if known_klass == unsafe { rb_cString } {
                 self.ctx.upgrade_opnd_type(insn_opnd, Type::CString);
@@ -4636,7 +4716,7 @@ impl CodeGenerator {
                             self.asm.cmp(symbol_id_opnd, mid.into());
                             self.jit_chain_guard(
                                 &starting_context,
-                                JCC_JNE,
+                                JumpCondition::NotEqual,
                                 SEND_MAX_CHAIN_DEPTH,
                                 chain_exit,
                             );
@@ -4825,7 +4905,7 @@ impl CodeGenerator {
                 counted_exit!(self.get_ocb(), side_exit, invokeblock_tag_changed);
             self.jit_chain_guard(
                 &self.ctx.clone(),
-                JCC_JNE,
+                JumpCondition::NotEqual,
                 SEND_MAX_CHAIN_DEPTH,
                 tag_changed_exit,
             );
@@ -4847,7 +4927,7 @@ impl CodeGenerator {
                 counted_exit!(self.get_ocb(), side_exit, invokeblock_iseq_block_changed);
             self.jit_chain_guard(
                 &self.ctx.clone(),
-                JCC_JNE,
+                JumpCondition::NotEqual,
                 SEND_MAX_CHAIN_DEPTH,
                 block_changed_exit,
             );
@@ -4890,7 +4970,7 @@ impl CodeGenerator {
                 counted_exit!(self.get_ocb(), side_exit, invokeblock_tag_changed);
             self.jit_chain_guard(
                 &self.ctx.clone(),
-                JCC_JNE,
+                JumpCondition::NotEqual,
                 SEND_MAX_CHAIN_DEPTH,
                 tag_changed_exit,
             );
@@ -5493,7 +5573,12 @@ impl CodeGenerator {
             // Bail if there is a block handler
             self.asm.cmp(block_handler, Opnd::UImm(0));
 
-            self.jit_chain_guard(&starting_context, JCC_JNZ, SEND_MAX_DEPTH, side_exit);
+            self.jit_chain_guard(
+                &starting_context,
+                JumpCondition::NotZero,
+                SEND_MAX_DEPTH,
+                side_exit,
+            );
 
             self.jit_putobject(Qnil);
         } else {
@@ -5503,7 +5588,12 @@ impl CodeGenerator {
             // Bail unless VM_BH_ISEQ_BLOCK_P(bh). This also checks for null.
             self.asm.cmp(block_handler, 0x1.into());
 
-            self.jit_chain_guard(&starting_context, JCC_JNZ, SEND_MAX_DEPTH, side_exit);
+            self.jit_chain_guard(
+                &starting_context,
+                JumpCondition::NotZero,
+                SEND_MAX_DEPTH,
+                side_exit,
+            );
 
             // Push rb_block_param_proxy. It's a root, so no need to use jit_mov_gc_ptr.
             assert!(!unsafe { rb_block_param_proxy }.special_const_p());
@@ -5706,7 +5796,7 @@ impl CodeGenerator {
         old_asm
     }
 
-    pub(crate) fn swap_ocb(&mut self) -> OutlinedCb {
+    pub fn swap_ocb(&mut self) -> OutlinedCb {
         let new_ocb = OutlinedCb::Dummy;
         let old_ocb = mem::replace(&mut self.ocb, new_ocb);
         old_ocb

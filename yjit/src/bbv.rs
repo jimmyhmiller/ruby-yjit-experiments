@@ -13,7 +13,7 @@ use crate::{
 use std::mem;
 
 /// Get all blocks for a particular place in an iseq.
-pub(crate) fn get_version_list(blockid: BlockId) -> Option<&'static mut VersionList> {
+pub fn get_version_list(blockid: BlockId) -> Option<&'static mut VersionList> {
     let insn_idx = blockid.idx.into_usize();
     match get_iseq_payload(blockid.iseq) {
         Some(payload) if insn_idx < payload.version_map.len() => {
@@ -24,7 +24,7 @@ pub(crate) fn get_version_list(blockid: BlockId) -> Option<&'static mut VersionL
 }
 
 /// Get or create all blocks for a particular place in an iseq.
-pub(crate) fn get_or_create_version_list(blockid: BlockId) -> &'static mut VersionList {
+pub fn get_or_create_version_list(blockid: BlockId) -> &'static mut VersionList {
     let payload = get_or_create_iseq_payload(blockid.iseq);
     let insn_idx = blockid.idx.into_usize();
 
@@ -50,7 +50,7 @@ pub fn take_version_list(blockid: BlockId) -> VersionList {
 }
 
 /// Count the number of block versions matching a given blockid
-pub(crate) fn get_num_versions(blockid: BlockId) -> usize {
+pub fn get_num_versions(blockid: BlockId) -> usize {
     let insn_idx = blockid.idx.into_usize();
     match get_iseq_payload(blockid.iseq) {
         Some(payload) => payload
@@ -85,7 +85,7 @@ pub fn get_or_create_iseq_block_list(iseq: IseqPtr) -> Vec<BlockRef> {
 
 /// Retrieve a basic block version for an (iseq, idx) tuple
 /// This will return None if no version is found
-pub(crate) fn find_block_version(blockid: BlockId, ctx: &Context) -> Option<BlockRef> {
+pub fn find_block_version(blockid: BlockId, ctx: &Context) -> Option<BlockRef> {
     let versions = match get_version_list(blockid) {
         Some(versions) => versions,
         None => return None,
@@ -152,7 +152,7 @@ pub fn limit_block_versions(blockid: BlockId, ctx: &Context) -> Context {
 
 /// Keep track of a block version. Block should be fully constructed.
 /// Uses `cb` for running write barriers.
-pub(crate) fn add_block_version(blockref: &BlockRef, cb: &CodeBlock) {
+pub fn add_block_version(blockref: &BlockRef, cb: &CodeBlock) {
     let block = blockref.borrow();
 
     // Function entry blocks must have stack size 0
@@ -190,7 +190,7 @@ pub(crate) fn add_block_version(blockref: &BlockRef, cb: &CodeBlock) {
 }
 
 /// Remove a block version from the version map of its parent ISEQ
-pub(crate) fn remove_block_version(blockref: &BlockRef) {
+pub fn remove_block_version(blockref: &BlockRef) {
     let block = blockref.borrow();
     let version_list = match get_version_list(block.blockid) {
         Some(version_list) => version_list,

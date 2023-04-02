@@ -76,7 +76,7 @@ impl CallFlags {
         self.0 & VM_CALL_ZSUPER != 0
     }
 
-    pub(crate) fn is_tail_call(&self) -> bool {
+    pub fn is_tail_call(&self) -> bool {
         self.0 & VM_CALL_TAILCALL != 0
     }
 }

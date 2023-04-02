@@ -305,7 +305,7 @@ mod sys {
 }
 
 #[cfg(not(test))]
-pub(crate) use sys::*;
+pub use sys::*;
 
 #[cfg(test)]
 pub mod tests {

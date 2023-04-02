@@ -9,7 +9,7 @@ use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, Target, CFP, EC, SP},
     bbv::limit_block_versions,
-    codegen::{generator::CodeGenerator, globals::CodegenGlobals},
+    codegen::{generator::{CodeGenerator, CodegenStatus}, globals::CodegenGlobals},
     core::{free_block, verify_blockid},
     cruby::{
         get_cikw_keyword_len, get_cikw_keywords_idx, get_def_method_serial, get_iseq_encoded_size,
@@ -32,6 +32,7 @@ use crate::{
     utils::{iseq_get_location, print_str, IntoUsize},
 };
 
+
 pub mod generator;
 pub mod globals;
 pub mod method_overrides;
@@ -39,17 +40,6 @@ pub mod method_overrides;
 /// Code generation function signature
 type InsnGenFn = fn(code_generator: &mut CodeGenerator) -> CodegenStatus;
 
-use self::generator::CodegenStatus;
-
-#[allow(non_camel_case_types, unused)]
-pub enum JCCKinds {
-    JCC_JNE,
-    JCC_JNZ,
-    JCC_JZ,
-    JCC_JE,
-    JCC_JBE,
-    JCC_JNA,
-}
 
 // Still a work in progress.
 // Trying to move things so they are in places that make sense.
@@ -515,16 +505,6 @@ unsafe extern "C" fn build_kwhash(ci: *const rb_callinfo, sp: *const VALUE) -> V
     hash
 }
 
-// Conditional move operation used by comparison operators
-type CmovFn = fn(cb: &mut Assembler, opnd0: Opnd, opnd1: Opnd) -> Opnd;
-
-/// For implementing global code invalidation. A position in the inline
-/// codeblock to patch into a JMP rel32 which jumps into some code in
-/// the outlined codeblock to exit to the interpreter.
-pub struct CodepagePatch {
-    pub inline_patch_pos: CodePtr,
-    pub outlined_target_pos: CodePtr,
-}
 
 /// Record the current codeblock write position for rewriting into a jump into
 /// the outlined block later. Used to implement global code invalidation.
