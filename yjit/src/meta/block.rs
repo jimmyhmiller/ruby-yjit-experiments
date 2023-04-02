@@ -147,8 +147,8 @@ impl Block {
 
     /// Instantiate a new CmeDependency struct and add it to the list of
     /// dependencies for this block.
-    pub fn set_cme_dependencies(&mut self, cme_dependencies: &Vec<CmePtr>) {
-        self.cme_dependencies = cme_dependencies.clone().into_boxed_slice();
+    pub fn set_cme_dependencies(&mut self, cme_dependencies: &[CmePtr]) {
+        self.cme_dependencies = cme_dependencies.to_owned().into_boxed_slice();
     }
 
     // Push an incoming branch ref and shrink the vector
@@ -158,8 +158,8 @@ impl Block {
     }
 
     // Push an outgoing branch ref and shrink the vector
-    pub fn set_outgoing(&mut self, outgoing: &Vec<BranchRef>) {
-        self.outgoing = outgoing.clone().into_boxed_slice();
+    pub fn set_outgoing(&mut self, outgoing: &[BranchRef]) {
+        self.outgoing = outgoing.to_owned().into_boxed_slice();
     }
 
     // Compute the size of the block code

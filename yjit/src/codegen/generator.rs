@@ -6,19 +6,16 @@ use std::os::raw::c_int;
 use std::ptr;
 use std::slice;
 
-use crate::asm::CodeBlock;
-use crate::bbv::limit_block_versions;
-use crate::meta::block::Block;
-use crate::meta::context::YARVOpnd;
+use crate::dev::stats::counted_exit;
+use crate::dev::stats::gen_counter_incr;
 pub use crate::virtualmem::CodePtr;
+
 use crate::{
-    asm::OutlinedCb,
+    asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, Opnd, Target, CFP, C_ARG_OPNDS, C_RET_OPND, EC, SP},
+    bbv::limit_block_versions,
+    branch::{gen_branch, gen_direct_jump, make_branch_entry, set_branch_target},
     codegen::globals::CodegenGlobals,
-    core::{gen_branch, gen_direct_jump, make_branch_entry, set_branch_target},
-    counted_exit,
-    // Intentionally expanding all of these so we can see all the stuff we depend on.
-    // To me this signals a potential missing abstraction
     cruby::{
         block_type_iseq, get_call_data_ci, get_cfp_ep, get_cikw_keyword_len,
         get_cme_def_body_attr_id, get_cme_def_body_cfunc, get_cme_def_body_optimized_index,
@@ -83,17 +80,20 @@ use crate::{
         VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF, VM_METHOD_TYPE_ZSUPER,
         VM_SPECIAL_OBJECT_VMCORE,
     },
-    dev::options::get_option,
-    dev::stats::{incr_counter, ptr_to_counter},
-    gen_counter_incr,
-    meta::block::{BlockId, BranchGenFn, BranchShape},
-    meta::call_info::CallInfo,
-    meta::context::{Context, Type, TypeDiff},
-    meta::invariants::{
-        assume_method_lookup_stable, assume_single_ractor_mode, assume_stable_constant_names,
-        Invariants,
+    dev::{
+        options::get_option,
+        stats::{incr_counter, ptr_to_counter},
     },
-    meta::jit_state::JITState,
+    meta::{
+        block::{Block, BlockId, BranchGenFn, BranchShape},
+        call_info::CallInfo,
+        context::{Context, Type, TypeDiff, YARVOpnd},
+        invariants::{
+            assume_method_lookup_stable, assume_single_ractor_mode, assume_stable_constant_names,
+            Invariants,
+        },
+        jit_state::JITState,
+    },
     utils::IntoUsize,
 };
 
@@ -101,7 +101,6 @@ use super::{c_method_tracing_currently_enabled, lookup_cfunc_codegen};
 
 // Conditional move operation used by comparison operators
 type CmovFn = fn(cb: &mut Assembler, opnd0: Opnd, opnd1: Opnd) -> Opnd;
-
 
 pub enum JumpCondition {
     NotEqual,
@@ -5792,13 +5791,13 @@ impl CodeGenerator {
 
     pub fn swap_asm(&mut self) -> Assembler {
         let new_asm = Assembler::new();
-        let old_asm = mem::replace(&mut self.asm, new_asm);
-        old_asm
+        
+        mem::replace(&mut self.asm, new_asm)
     }
 
     pub fn swap_ocb(&mut self) -> OutlinedCb {
         let new_ocb = OutlinedCb::Dummy;
-        let old_ocb = mem::replace(&mut self.ocb, new_ocb);
-        old_ocb
+        
+        mem::replace(&mut self.ocb, new_ocb)
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     asm::CodeBlock,
     codegen::globals::CodegenGlobals,
-    core::{free_block, gen_entry_point},
+    core::gen_entry_point,
     cruby::{
         get_iseq_encoded_size, rb_bug, rb_gc_location, rb_gc_mark_movable,
         rb_get_iseq_body_stack_max, rb_vm_barrier, EcPtr, IseqPtr, Qnil, VALUE,
@@ -9,6 +9,7 @@ use crate::{
     dev::options::{get_option, parse_option},
     dev::stats::{incr_counter, YjitExitLocations},
     meta::{block::IseqPayload, invariants::Invariants},
+    remove_block::free_block,
     utils::IntoUsize,
 };
 

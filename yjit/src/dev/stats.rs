@@ -742,7 +742,7 @@ fn global_allocation_size() -> usize {
         .saturating_sub(stats.bytes_deallocated)
 }
 
-#[macro_export]
+
 macro_rules! gen_counter_incr {
     ($asm:expr, $counter_name:ident) => {
         use $crate::codegen::Opnd;
@@ -762,12 +762,14 @@ macro_rules! gen_counter_incr {
     };
 }
 
-#[macro_export]
+pub(crate) use gen_counter_incr;
+
+
 macro_rules! counted_exit {
     ($ocb:expr, $existing_side_exit:tt, $counter_name:ident) => {{
         use $crate::codegen::Assembler;
         use $crate::dev::options::get_option;
-        use $crate::gen_counter_incr;
+        use $crate::dev::stats::gen_counter_incr;
         // The counter is only incremented when stats are enabled
         if (!get_option!(gen_stats)) {
             $existing_side_exit
@@ -789,3 +791,4 @@ macro_rules! counted_exit {
         }
     }};
 }
+pub(crate) use counted_exit;

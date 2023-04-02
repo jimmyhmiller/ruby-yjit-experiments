@@ -3,14 +3,13 @@ use std::{collections::HashMap, mem};
 use crate::{
     asm::{CodeBlock, OutlinedCb},
     backend::ir::{Assembler, CFP, C_RET_OPND, EC, SP},
+    branch::gen_branch_stub_hit_trampoline,
     codegen::CodePtr,
-    core::gen_branch_stub_hit_trampoline,
     cruby::{
         get_def_method_serial, rb_callable_method_entry_t, rb_callinfo, rb_full_cfunc_return,
         rb_intern, rb_method_entry_at, IseqPtr, Qundef, VALUE,
     },
-    dev::options::get_option,
-    gen_counter_incr,
+    dev::{options::get_option, stats::gen_counter_incr},
 };
 
 // This is only called in global when are setting up globals. Where does it belong?

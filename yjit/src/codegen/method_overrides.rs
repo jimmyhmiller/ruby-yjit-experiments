@@ -1,6 +1,5 @@
 use crate::{
     backend::ir::{Opnd, EC},
-    counted_exit,
     cruby::{
         get_cme_def_type, idRespond_to_missing, rb_cArray, rb_cBasicObject, rb_cInteger,
         rb_cModule, rb_cNilClass, rb_cString, rb_cSymbol, rb_cThread,
@@ -16,7 +15,7 @@ use crate::{
     meta::{
         context::{Type, YARVOpnd},
         invariants::{assume_method_basic_definition, assume_method_lookup_stable},
-    },
+    }, dev::stats::counted_exit,
 };
 
 use super::globals::CodegenGlobals;

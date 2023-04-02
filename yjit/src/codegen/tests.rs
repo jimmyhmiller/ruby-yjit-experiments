@@ -1,6 +1,7 @@
 use std::ptr;
 
 use crate::{
+    asm::OutlinedCb,
     codegen::globals::gen_leave_exit,
     cruby::{Qtrue, YARVINSN_putobject_INT2FIX_0_},
     meta::context::{Type, TypeDiff, YARVOpnd},
@@ -37,7 +38,7 @@ fn test_gen_leave_exit() {
 fn test_gen_exit() {
     let (mut gen, mut cb) = setup_codegen();
     let mut asm = gen.swap_asm();
-    gen.gen_exit(std::ptr::null_mut::<VALUE>(), &mut asm, &gen.ctx.clone());
+    CodeGenerator::gen_exit(std::ptr::null_mut::<VALUE>(), &mut asm, &gen.ctx.clone());
     asm.compile(&mut cb);
     assert!(cb.get_write_pos() > 0);
 }

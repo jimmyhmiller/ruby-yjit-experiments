@@ -6,11 +6,14 @@ use std::os::raw::c_uint;
 pub use crate::virtualmem::CodePtr;
 
 use crate::{
-    asm::{CodeBlock, OutlinedCb},
+    asm::CodeBlock,
     backend::ir::{Assembler, Opnd, Target, CFP, EC, SP},
     bbv::limit_block_versions,
-    codegen::{generator::{CodeGenerator, CodegenStatus}, globals::CodegenGlobals},
-    core::{free_block, verify_blockid},
+    codegen::{
+        generator::{CodeGenerator, CodegenStatus},
+        globals::CodegenGlobals,
+    },
+    core::verify_blockid,
     cruby::{
         get_cikw_keyword_len, get_cikw_keywords_idx, get_def_method_serial, get_iseq_encoded_size,
         insn_len, insn_name, rb_c_method_tracing_currently_enabled, rb_callinfo,
@@ -20,18 +23,24 @@ use crate::{
         RUBY_OFFSET_EC_INTERRUPT_FLAG, VALUE,
     },
     dev::{
-        options::{get_option, get_option_ref},
-        stats::{ptr_to_counter, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack},
+        options::{get_option},
+        stats::{rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack, gen_counter_incr},
     },
-    gen_counter_incr,
+
     meta::{
         block::{Block, BlockId, BlockRef},
         context::{verify_ctx, Context},
         jit_state::JITState,
     },
-    utils::{iseq_get_location, print_str, IntoUsize},
+    remove_block::free_block,
+    utils::{print_str, IntoUsize},
 };
 
+#[cfg(feature = "disasm")]
+use crate::dev::options::get_option_ref;
+
+#[cfg(feature = "disasm")]
+use crate::utils::iseq_get_location;
 
 pub mod generator;
 pub mod globals;
@@ -39,7 +48,6 @@ pub mod method_overrides;
 
 /// Code generation function signature
 type InsnGenFn = fn(code_generator: &mut CodeGenerator) -> CodegenStatus;
-
 
 // Still a work in progress.
 // Trying to move things so they are in places that make sense.
@@ -88,8 +96,12 @@ impl CodeGenerator {
         });
     }
 
+    // TODO:
+    // I don't understand why this takes an assembler, rather than using the one on self.
+    // Need to understand this code path better.
+
     /// Generate an exit to return to the interpreter
-    fn gen_exit(&mut self, exit_pc: *mut VALUE, asm: &mut Assembler, ctx: &Context) {
+    fn gen_exit(exit_pc: *mut VALUE, asm: &mut Assembler, ctx: &Context) {
         #[cfg(all(feature = "disasm", not(test)))]
         {
             use crate::cruby::rb_vm_insn_addr2opcode;
@@ -144,8 +156,7 @@ impl CodeGenerator {
         let cb = self.ocb.unwrap();
         let exit_code = cb.get_write_ptr();
         let mut asm = Assembler::new();
-        drop(cb);
-        self.gen_exit(exit_pc, &mut asm, ctx);
+        Self::gen_exit(exit_pc, &mut asm, ctx);
         let cb = self.ocb.unwrap();
         asm.compile(cb);
 
@@ -234,8 +245,8 @@ impl CodeGenerator {
             // If previous instruction requested to record the boundary
             if self.jit.record_boundary_patch_point {
                 // Generate an exit to this instruction and record it
-                let exit_pos = old_gen_outlined_exit(self.jit.pc, &self.ctx, &mut self.ocb);
-                old_record_global_inval_patch(&mut self.asm, exit_pos);
+                let exit_pos = self.gen_outlined_exit(self.jit.pc, &self.ctx.clone());
+                self.record_global_inval_patch(exit_pos);
                 self.jit.record_boundary_patch_point = false;
             }
 
@@ -277,7 +288,7 @@ impl CodeGenerator {
                 // We are using starting_ctx so that if code_generator.ctx got mutated
                 // it won't matter. If you write to the stack to you could still get errors,
                 // but not from simple push and pops
-                old_gen_exit(self.jit.pc, &starting_ctx, &mut self.asm);
+                Self::gen_exit(self.jit.pc, &mut self.asm, &starting_ctx);
 
                 // If this is the first instruction in the block, then we can use
                 // the exit for block->entry_exit.
@@ -349,8 +360,8 @@ impl CodeGenerator {
 }
 
 impl CodeGenerator {
+    #[cfg(feature = "disasm")]
     fn debug_record_block_comment(&mut self, blockid: BlockId) {
-        #[cfg(feature = "disasm")]
         if let Some(_) = get_option_ref!(dump_disasm) {
             let blockid_idx = blockid.idx;
             let chain_depth = match self.ctx.get_chain_depth() {
@@ -364,6 +375,8 @@ impl CodeGenerator {
             ));
         }
     }
+    #[cfg(not(feature = "disasm"))]
+    fn debug_record_block_comment(&mut self, _blockid: BlockId) {}
 }
 
 /// Maps a YARV opcode to a code generation function (if supported)
@@ -503,80 +516,6 @@ unsafe extern "C" fn build_kwhash(ci: *const rb_callinfo, sp: *const VALUE) -> V
         rb_hash_aset(hash, key, val);
     }
     hash
-}
-
-
-/// Record the current codeblock write position for rewriting into a jump into
-/// the outlined block later. Used to implement global code invalidation.
-fn old_record_global_inval_patch(asm: &mut Assembler, outline_block_target_pos: CodePtr) {
-    asm.pad_inval_patch();
-    asm.pos_marker(move |code_ptr| {
-        CodegenGlobals::push_global_inval_patch(code_ptr, outline_block_target_pos);
-    });
-}
-
-/// Generate an exit to return to the interpreter
-fn old_gen_exit(exit_pc: *mut VALUE, ctx: &Context, asm: &mut Assembler) {
-    #[cfg(all(feature = "disasm", not(test)))]
-    {
-        use crate::cruby::rb_vm_insn_addr2opcode;
-        let opcode = unsafe { rb_vm_insn_addr2opcode((*exit_pc).as_ptr()) };
-        asm.comment(&format!(
-            "exit to interpreter on {}",
-            insn_name(opcode as usize)
-        ));
-    }
-
-    // Generate the code to exit to the interpreters
-    // Write the adjusted SP back into the CFP
-    if ctx.get_sp_offset() != 0 {
-        let sp_opnd = asm.lea(ctx.sp_opnd(0));
-        asm.mov(Opnd::mem(64, CFP, RUBY_OFFSET_CFP_SP), sp_opnd);
-    }
-
-    // Update CFP->PC
-    asm.mov(
-        Opnd::mem(64, CFP, RUBY_OFFSET_CFP_PC),
-        Opnd::const_ptr(exit_pc as *const u8),
-    );
-
-    // Accumulate stats about interpreter exits
-    if get_option!(gen_stats) {
-        asm.ccall(
-            rb_yjit_count_side_exit_op as *const u8,
-            vec![Opnd::const_ptr(exit_pc as *const u8)],
-        );
-
-        // If --yjit-trace-exits option is enabled, record the exit stack
-        // while recording the side exits.
-        if get_option!(gen_trace_exits) {
-            asm.ccall(
-                rb_yjit_record_exit_stack as *const u8,
-                vec![Opnd::const_ptr(exit_pc as *const u8)],
-            );
-        }
-    }
-
-    asm.cpop_into(SP);
-    asm.cpop_into(EC);
-    asm.cpop_into(CFP);
-
-    asm.frame_teardown();
-
-    asm.cret(Qundef.into());
-}
-
-/// Generate an exit to the interpreter in the outlined code block
-fn old_gen_outlined_exit(exit_pc: *mut VALUE, ctx: &Context, ocb: &mut OutlinedCb) -> CodePtr {
-    let cb = ocb.unwrap();
-    let exit_code = cb.get_write_ptr();
-    let mut asm = Assembler::new();
-
-    old_gen_exit(exit_pc, ctx, &mut asm);
-
-    asm.compile(cb);
-
-    exit_code
 }
 
 // Generate a runtime guard that ensures the PC is at the expected

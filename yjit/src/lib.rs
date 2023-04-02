@@ -1,6 +1,7 @@
 mod asm;
 mod backend;
 mod bbv;
+mod branch;
 mod codegen;
 mod core;
 mod cruby;
@@ -8,5 +9,6 @@ mod dev;
 mod ffi;
 mod iseq;
 mod meta;
+mod remove_block;
 mod utils;
 mod virtualmem;

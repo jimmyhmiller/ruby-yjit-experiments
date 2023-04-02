@@ -4,7 +4,6 @@
 use crate::{
     bbv::take_version_list,
     codegen::{generator::CodeGenerator, globals::CodegenGlobals},
-    core::{delayed_deallocation, free_block, invalidate_block_version},
     cruby::{
         get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL, rb_callable_method_entry,
         rb_callable_method_entry_t, rb_gc_mark, rb_iseq_reset_jit_func, rb_iseq_t,
@@ -18,6 +17,7 @@ use crate::{
     iseq::{for_each_iseq, for_each_on_stack_iseq, get_iseq_payload},
     meta::block::{BlockId, BlockRef},
     meta::jit_state::JITState,
+    remove_block::{delayed_deallocation, free_block, invalidate_block_version},
     utils::IntoUsize,
 };
 
