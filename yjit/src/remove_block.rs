@@ -7,12 +7,12 @@ use crate::{
     codegen::globals::CodegenGlobals,
     core::verify_blockid,
     cruby::rb_iseq_reset_jit_func,
-    dev::{stats::incr_counter},
+    dev::stats::incr_counter,
     iseq::get_iseq_payload,
     meta::{
         block::{BlockRef, BranchShape, BranchStub, BranchTarget},
         invariants::block_assumptions_free,
-    }
+    },
 };
 
 fn remove_from_graph(blockref: &BlockRef) {

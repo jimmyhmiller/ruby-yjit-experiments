@@ -23,10 +23,9 @@ use crate::{
         RUBY_OFFSET_EC_INTERRUPT_FLAG, VALUE,
     },
     dev::{
-        options::{get_option},
-        stats::{rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack, gen_counter_incr},
+        options::get_option,
+        stats::{gen_counter_incr, rb_yjit_count_side_exit_op, rb_yjit_record_exit_stack},
     },
-
     meta::{
         block::{Block, BlockId, BlockRef},
         context::{verify_ctx, Context},

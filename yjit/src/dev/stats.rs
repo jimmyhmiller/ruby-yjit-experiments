@@ -742,7 +742,6 @@ fn global_allocation_size() -> usize {
         .saturating_sub(stats.bytes_deallocated)
 }
 
-
 macro_rules! gen_counter_incr {
     ($asm:expr, $counter_name:ident) => {
         use $crate::codegen::Opnd;
@@ -763,7 +762,6 @@ macro_rules! gen_counter_incr {
 }
 
 pub(crate) use gen_counter_incr;
-
 
 macro_rules! counted_exit {
     ($ocb:expr, $existing_side_exit:tt, $counter_name:ident) => {{

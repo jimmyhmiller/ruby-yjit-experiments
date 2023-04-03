@@ -6,6 +6,7 @@ mod codegen;
 mod core;
 mod cruby;
 mod dev;
+mod entry_point;
 mod ffi;
 mod iseq;
 mod meta;

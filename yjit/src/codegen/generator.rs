@@ -5791,13 +5791,13 @@ impl CodeGenerator {
 
     pub fn swap_asm(&mut self) -> Assembler {
         let new_asm = Assembler::new();
-        
+
         mem::replace(&mut self.asm, new_asm)
     }
 
     pub fn swap_ocb(&mut self) -> OutlinedCb {
         let new_ocb = OutlinedCb::Dummy;
-        
+
         mem::replace(&mut self.ocb, new_ocb)
     }
 }

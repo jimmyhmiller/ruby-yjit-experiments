@@ -12,10 +12,11 @@ use crate::{
         RUBY_T_CLASS, RUBY_T_MODULE, RUBY_T_STRING, SIZEOF_VALUE_I32, VALUE, VM_BLOCK_HANDLER_NONE,
         VM_ENV_DATA_INDEX_SPECVAL, VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF,
     },
+    dev::stats::counted_exit,
     meta::{
         context::{Type, YARVOpnd},
         invariants::{assume_method_basic_definition, assume_method_lookup_stable},
-    }, dev::stats::counted_exit,
+    },
 };
 
 use super::globals::CodegenGlobals;
