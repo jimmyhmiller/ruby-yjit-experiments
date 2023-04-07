@@ -17,7 +17,8 @@ use crate::{
     meta::block::{BlockId, BlockRef},
     meta::jit_state::JITState,
     remove_block::{delayed_deallocation, free_block, invalidate_block_version},
-    utils::IntoUsize, revolution::old_world::yjit_enabled_p,
+    revolution::old_world::yjit_enabled_p,
+    utils::IntoUsize,
 };
 
 use std::collections::{HashMap, HashSet};

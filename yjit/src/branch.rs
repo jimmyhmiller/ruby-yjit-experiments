@@ -12,7 +12,8 @@ use crate::{
     codegen::{generator::CodeGenerator, globals::CodegenGlobals, CodePtr},
     core::gen_block_series,
     cruby::{
-        get_cfp_sp, get_ec_cfp, rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_set_cfp_pc, rb_set_cfp_sp, EcPtr,
+        get_cfp_sp, get_ec_cfp, rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_set_cfp_pc, rb_set_cfp_sp,
+        EcPtr,
     },
     dev::{options::get_option, stats::incr_counter},
     meta::{
@@ -23,7 +24,8 @@ use crate::{
         context::Context,
         jit_state::JITState,
     },
-    utils::IntoUsize, revolution::c_funcs::branch_stub_hit,
+    revolution::c_funcs::branch_stub_hit,
+    utils::IntoUsize,
 };
 
 /// Called by the generated code when a branch stub is executed

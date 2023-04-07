@@ -11,6 +11,6 @@ mod ffi;
 mod iseq;
 mod meta;
 mod remove_block;
+mod revolution;
 mod utils;
 mod virtualmem;
-mod revolution;

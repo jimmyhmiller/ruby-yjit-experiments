@@ -1,8 +1,11 @@
 use std::{ffi::c_void, os::raw};
 
-use crate::cruby::{EcPtr, VALUE, IseqPtr};
+use crate::cruby::{EcPtr, IseqPtr, VALUE};
 
 // Do I want to use raw here? Probably not.
+
+// Looks like I'm missing some functions from Ivariants.
+// Need to add these to get the true interface.
 
 pub trait Compiler {
     fn init(&mut self);

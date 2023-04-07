@@ -1,11 +1,12 @@
-use std::{os::raw, ffi::c_void};
+use std::{ffi::c_void, os::raw};
 
-use crate::{cruby::{IseqPtr, EcPtr, VALUE}, utils::c_callable};
+use crate::{
+    cruby::{EcPtr, IseqPtr, VALUE},
+    utils::c_callable,
+};
 
 use super::global::get_compiler;
 use super::traits::Compiler;
-
-
 
 /// Called from C code to begin compiling a function
 /// NOTE: this should be wrapped in RB_VM_LOCK_ENTER(), rb_vm_barrier() on the C side

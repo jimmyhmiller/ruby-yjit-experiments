@@ -150,10 +150,9 @@ pub struct CodegenContext {
     code_gc_count: usize,
 }
 
-
 /// Global state needed for code generation
 pub struct CodegenGlobals {
-    context: CodegenContext
+    context: CodegenContext,
 }
 
 /// Private singleton instance of the codegen globals
@@ -232,7 +231,7 @@ impl CodegenGlobals {
         ocb.unwrap().mark_all_executable();
 
         let mut codegen_globals = CodegenGlobals {
-            context: CodegenContext { 
+            context: CodegenContext {
                 inline_cb: cb,
                 outlined_cb: Some(ocb),
                 leave_exit_code,
@@ -243,7 +242,7 @@ impl CodegenGlobals {
                 method_codegen_table: HashMap::new(),
                 ocb_pages,
                 code_gc_count: 0,
-            }
+            },
         };
 
         // Register the method codegen functions
@@ -278,14 +277,15 @@ impl CodegenGlobals {
             get_def_method_serial(def)
         };
 
-        self.context.method_codegen_table.insert(method_serial, gen_fn);
+        self.context
+            .method_codegen_table
+            .insert(method_serial, gen_fn);
     }
 
     /// Get a mutable reference to the codegen globals instance
     pub fn get_instance() -> &'static mut CodegenGlobals {
         unsafe { CODEGEN_GLOBALS.as_mut().unwrap() }
     }
-
 
     pub fn has_instance() -> bool {
         unsafe { CODEGEN_GLOBALS.as_mut().is_some() }
@@ -348,11 +348,15 @@ impl CodegenGlobals {
     }
 
     pub fn get_outline_full_cfunc_return_pos() -> CodePtr {
-        CodegenGlobals::get_instance().context.outline_full_cfunc_return_pos
+        CodegenGlobals::get_instance()
+            .context
+            .outline_full_cfunc_return_pos
     }
 
     pub fn get_branch_stub_hit_trampoline() -> CodePtr {
-        CodegenGlobals::get_instance().context.branch_stub_hit_trampoline
+        CodegenGlobals::get_instance()
+            .context
+            .branch_stub_hit_trampoline
     }
 
     pub fn look_up_codegen_method(method_serial: usize) -> Option<MethodGenFn> {

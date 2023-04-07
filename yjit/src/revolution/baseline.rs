@@ -1,14 +1,17 @@
 use std::os::raw;
 
-use crate::codegen::{globals::CodegenContext, generator::CodeGenerator};
+use crate::{
+    codegen::{generator::CodeGenerator, globals::CodegenContext},
+    meta::invariants::Invariants,
+};
 
 use super::traits::Compiler;
-
 
 #[allow(unused)]
 pub struct Baseline {
     codegen_context: CodegenContext,
     generator: CodeGenerator,
+    invariants: Invariants,
 }
 
 #[allow(unused)]
@@ -28,7 +31,12 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn stub_hit(&mut self, branch_ptr: *const std::ffi::c_void, target_idx: u32, ec: crate::cruby::EcPtr) -> *const u8 {
+    fn stub_hit(
+        &mut self,
+        branch_ptr: *const std::ffi::c_void,
+        target_idx: u32,
+        ec: crate::cruby::EcPtr,
+    ) -> *const u8 {
         todo!()
     }
 
@@ -44,11 +52,19 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn code_gc(&mut self, ec: crate::cruby::EcPtr, ruby_self: crate::cruby::VALUE) -> crate::cruby::VALUE {
+    fn code_gc(
+        &mut self,
+        ec: crate::cruby::EcPtr,
+        ruby_self: crate::cruby::VALUE,
+    ) -> crate::cruby::VALUE {
         todo!()
     }
 
-    fn simulate_out_of_memory(&mut self, ec: crate::cruby::EcPtr, ruby_self: crate::cruby::VALUE) -> crate::cruby::VALUE {
+    fn simulate_out_of_memory(
+        &mut self,
+        ec: crate::cruby::EcPtr,
+        ruby_self: crate::cruby::VALUE,
+    ) -> crate::cruby::VALUE {
         todo!()
     }
 

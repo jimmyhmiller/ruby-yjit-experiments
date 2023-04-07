@@ -9,9 +9,8 @@ use crate::{
     branch::branch_stub_hit_body,
     codegen::globals::CodegenGlobals,
     cruby::{
-        rb_bug, rb_gc_location, rb_gc_mark_movable, rb_vm_barrier,
-        rb_get_iseq_body_stack_max, get_iseq_encoded_size,
-        src_loc, with_vm_lock, Qnil, VALUE,
+        get_iseq_encoded_size, rb_bug, rb_gc_location, rb_gc_mark_movable,
+        rb_get_iseq_body_stack_max, rb_vm_barrier, src_loc, with_vm_lock, Qnil, VALUE,
     },
     dev::{
         options::{get_option, parse_option},
@@ -29,7 +28,7 @@ pub struct OldWorld {}
 
 impl OldWorld {
     pub fn new() -> Self {
-        OldWorld {  }
+        OldWorld {}
     }
 }
 

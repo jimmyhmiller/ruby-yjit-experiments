@@ -12,7 +12,8 @@ use crate::{
     },
     dev::options::get_option,
     iseq::for_each_iseq_payload,
-    meta::context::Context, revolution::old_world::yjit_enabled_p,
+    meta::context::Context,
+    revolution::old_world::yjit_enabled_p,
 };
 
 // stats_alloc is a middleware to instrument global allocations in Rust.
