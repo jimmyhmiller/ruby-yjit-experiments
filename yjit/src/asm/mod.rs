@@ -4,10 +4,7 @@ use crate::backend::arm64::JMP_PTR_BYTES;
 use crate::backend::x86_64::JMP_PTR_BYTES;
 use crate::iseq::{for_each_off_stack_iseq_payload, for_each_on_stack_iseq_payload};
 use crate::meta::invariants;
-use crate::{
-    meta::block::IseqPayload,
-    virtualmem::WriteError,
-};
+use crate::{meta::block::IseqPayload, virtualmem::WriteError};
 use std::cell::RefCell;
 use std::fmt;
 use std::mem;

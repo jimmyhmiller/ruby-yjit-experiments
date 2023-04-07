@@ -17,7 +17,10 @@ use crate::{
         stats::{incr_counter, YjitExitLocations},
     },
     entry_point::gen_entry_point,
-    meta::{block::IseqPayload, invariants::{Invariants, self}},
+    meta::{
+        block::IseqPayload,
+        invariants::{self, Invariants},
+    },
     remove_block::free_block,
     utils::IntoUsize,
 };
@@ -292,11 +295,18 @@ impl Compiler for OldWorld {
         });
     }
 
-    fn invalidate_callable_method_entry(&mut self, callee_cme: *const crate::cruby::CallableMethodEntry) {
+    fn invalidate_callable_method_entry(
+        &mut self,
+        callee_cme: *const crate::cruby::CallableMethodEntry,
+    ) {
         invariants::cme_invalidate(callee_cme);
     }
 
-    fn basic_operator_redefined(&mut self, klass: crate::cruby::RedefinitionFlag, bop: crate::cruby::RubyBasicOperators) {
+    fn basic_operator_redefined(
+        &mut self,
+        klass: crate::cruby::RedefinitionFlag,
+        bop: crate::cruby::RubyBasicOperators,
+    ) {
         invariants::bop_redefined(klass, bop);
     }
 
@@ -312,7 +322,12 @@ impl Compiler for OldWorld {
         invariants::root_mark();
     }
 
-    fn constant_inline_cache_update(&mut self, iseq: *const crate::cruby::InstructionSequence, ic: crate::cruby::InlineCache, insn_idx: u32) {
+    fn constant_inline_cache_update(
+        &mut self,
+        iseq: *const crate::cruby::InstructionSequence,
+        ic: crate::cruby::InlineCache,
+        insn_idx: u32,
+    ) {
         invariants::constant_ic_update(iseq, ic, insn_idx);
     }
 

@@ -1,7 +1,10 @@
 use std::{ffi::c_void, os::raw};
 
 use crate::{
-    cruby::{EcPtr, IseqPtr, VALUE, RubyBasicOperators, CallableMethodEntry, RedefinitionFlag, ID, IC, InlineCache, InstructionSequence},
+    cruby::{
+        CallableMethodEntry, EcPtr, InlineCache, InstructionSequence, IseqPtr, RedefinitionFlag,
+        RubyBasicOperators, IC, ID, VALUE,
+    },
     utils::c_callable,
 };
 
@@ -87,35 +90,39 @@ pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_bop_redefined(klass: RedefinitionFlag, bop: RubyBasicOperators) {
-	get_compiler().basic_operator_redefined(klass, bop);
+    get_compiler().basic_operator_redefined(klass, bop);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_cme_invalidate(callee_cme: *const CallableMethodEntry) {
-	get_compiler().invalidate_callable_method_entry(callee_cme);
+    get_compiler().invalidate_callable_method_entry(callee_cme);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_before_ractor_spawn() {
-	get_compiler().before_ractor_spawn();
+    get_compiler().before_ractor_spawn();
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
-	get_compiler().constant_state_changed(id);
+    get_compiler().constant_state_changed(id);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_root_mark() {
-	get_compiler().mark_root();
+    get_compiler().mark_root();
 }
 
 #[no_mangle]
-pub extern "C" fn rb_yjit_constant_ic_update(iseq: *const InstructionSequence, ic: InlineCache, insn_idx: u32) {
-	get_compiler().constant_inline_cache_update(iseq, ic, insn_idx);
+pub extern "C" fn rb_yjit_constant_ic_update(
+    iseq: *const InstructionSequence,
+    ic: InlineCache,
+    insn_idx: u32,
+) {
+    get_compiler().constant_inline_cache_update(iseq, ic, insn_idx);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_tracing_invalidate_all() {
-	get_compiler().tracing_enabled();
+    get_compiler().tracing_enabled();
 }

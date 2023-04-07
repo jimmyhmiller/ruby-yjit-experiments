@@ -80,11 +80,18 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn invalidate_callable_method_entry(&mut self, callee_cme: *const crate::cruby::CallableMethodEntry) {
+    fn invalidate_callable_method_entry(
+        &mut self,
+        callee_cme: *const crate::cruby::CallableMethodEntry,
+    ) {
         todo!()
     }
 
-    fn basic_operator_redefined(&mut self, klass: crate::cruby::RedefinitionFlag, bop: crate::cruby::RubyBasicOperators) {
+    fn basic_operator_redefined(
+        &mut self,
+        klass: crate::cruby::RedefinitionFlag,
+        bop: crate::cruby::RubyBasicOperators,
+    ) {
         todo!()
     }
 
@@ -100,7 +107,12 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn constant_inline_cache_update(&mut self, iseq: *const crate::cruby::InstructionSequence, ic: crate::cruby::InlineCache, insn_idx: u32) {
+    fn constant_inline_cache_update(
+        &mut self,
+        iseq: *const crate::cruby::InstructionSequence,
+        ic: crate::cruby::InlineCache,
+        insn_idx: u32,
+    ) {
         todo!()
     }
 
