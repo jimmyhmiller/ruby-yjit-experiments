@@ -117,8 +117,7 @@ pub type MethodGenFn = fn(
     known_recv_class: *const VALUE,
 ) -> bool;
 
-/// Global state needed for code generation
-pub struct CodegenGlobals {
+pub struct CodegenContext {
     /// Inline code block (fast path)
     inline_cb: CodeBlock,
 
@@ -149,6 +148,12 @@ pub struct CodegenGlobals {
 
     /// How many times code GC has been executed.
     code_gc_count: usize,
+}
+
+
+/// Global state needed for code generation
+pub struct CodegenGlobals {
+    context: CodegenContext
 }
 
 /// Private singleton instance of the codegen globals
@@ -227,16 +232,18 @@ impl CodegenGlobals {
         ocb.unwrap().mark_all_executable();
 
         let mut codegen_globals = CodegenGlobals {
-            inline_cb: cb,
-            outlined_cb: Some(ocb),
-            leave_exit_code,
-            stub_exit_code,
-            outline_full_cfunc_return_pos: cfunc_exit_code,
-            branch_stub_hit_trampoline,
-            global_inval_patches: Vec::new(),
-            method_codegen_table: HashMap::new(),
-            ocb_pages,
-            code_gc_count: 0,
+            context: CodegenContext { 
+                inline_cb: cb,
+                outlined_cb: Some(ocb),
+                leave_exit_code,
+                stub_exit_code,
+                outline_full_cfunc_return_pos: cfunc_exit_code,
+                branch_stub_hit_trampoline,
+                global_inval_patches: Vec::new(),
+                method_codegen_table: HashMap::new(),
+                ocb_pages,
+                code_gc_count: 0,
+            }
         };
 
         // Register the method codegen functions
@@ -271,7 +278,7 @@ impl CodegenGlobals {
             get_def_method_serial(def)
         };
 
-        self.method_codegen_table.insert(method_serial, gen_fn);
+        self.context.method_codegen_table.insert(method_serial, gen_fn);
     }
 
     /// Get a mutable reference to the codegen globals instance
@@ -279,26 +286,27 @@ impl CodegenGlobals {
         unsafe { CODEGEN_GLOBALS.as_mut().unwrap() }
     }
 
+
     pub fn has_instance() -> bool {
         unsafe { CODEGEN_GLOBALS.as_mut().is_some() }
     }
 
     /// Get a mutable reference to the inline code block
     pub fn get_inline_cb() -> &'static mut CodeBlock {
-        &mut CodegenGlobals::get_instance().inline_cb
+        &mut CodegenGlobals::get_instance().context.inline_cb
     }
 
     pub fn set_outlined_cb(value: OutlinedCb) {
-        CodegenGlobals::get_instance().outlined_cb = Some(value);
+        CodegenGlobals::get_instance().context.outlined_cb = Some(value);
     }
 
     pub fn take_outlined_cb() -> Option<OutlinedCb> {
-        CodegenGlobals::get_instance().outlined_cb.take()
+        CodegenGlobals::get_instance().context.outlined_cb.take()
     }
 
     pub fn with_outlined_cb<F: FnOnce(&mut OutlinedCb)>(f: F) {
         let globals = CodegenGlobals::get_instance();
-        if let Some(outlined_cb) = &mut globals.outlined_cb {
+        if let Some(outlined_cb) = &mut globals.context.outlined_cb {
             f(outlined_cb);
         } else {
             panic!("No outlined code block available in with");
@@ -307,7 +315,7 @@ impl CodegenGlobals {
 
     pub fn map_outlined_cb<F: FnOnce(&mut OutlinedCb) -> T, T>(f: F) -> Option<T> {
         let globals = CodegenGlobals::get_instance();
-        if let Some(outlined_cb) = &mut globals.outlined_cb {
+        if let Some(outlined_cb) = &mut globals.context.outlined_cb {
             Some(f(outlined_cb))
         } else {
             panic!("No outlined code block available in map");
@@ -315,11 +323,11 @@ impl CodegenGlobals {
     }
 
     pub fn get_leave_exit_code() -> CodePtr {
-        CodegenGlobals::get_instance().leave_exit_code
+        CodegenGlobals::get_instance().context.leave_exit_code
     }
 
     pub fn get_stub_exit_code() -> CodePtr {
-        CodegenGlobals::get_instance().stub_exit_code
+        CodegenGlobals::get_instance().context.stub_exit_code
     }
 
     pub fn push_global_inval_patch(i_pos: CodePtr, o_pos: CodePtr) {
@@ -328,6 +336,7 @@ impl CodegenGlobals {
             outlined_target_pos: o_pos,
         };
         CodegenGlobals::get_instance()
+            .context
             .global_inval_patches
             .push(patch);
     }
@@ -335,33 +344,33 @@ impl CodegenGlobals {
     // Drain the list of patches and return it
     pub fn take_global_inval_patches() -> Vec<CodepagePatch> {
         let globals = CodegenGlobals::get_instance();
-        mem::take(&mut globals.global_inval_patches)
+        mem::take(&mut globals.context.global_inval_patches)
     }
 
     pub fn get_outline_full_cfunc_return_pos() -> CodePtr {
-        CodegenGlobals::get_instance().outline_full_cfunc_return_pos
+        CodegenGlobals::get_instance().context.outline_full_cfunc_return_pos
     }
 
     pub fn get_branch_stub_hit_trampoline() -> CodePtr {
-        CodegenGlobals::get_instance().branch_stub_hit_trampoline
+        CodegenGlobals::get_instance().context.branch_stub_hit_trampoline
     }
 
     pub fn look_up_codegen_method(method_serial: usize) -> Option<MethodGenFn> {
-        let table = &CodegenGlobals::get_instance().method_codegen_table;
+        let table = &CodegenGlobals::get_instance().context.method_codegen_table;
 
         let option_ref = table.get(&method_serial);
         option_ref.copied()
     }
 
     pub fn get_ocb_pages() -> &'static Vec<usize> {
-        &CodegenGlobals::get_instance().ocb_pages
+        &CodegenGlobals::get_instance().context.ocb_pages
     }
 
     pub fn incr_code_gc_count() {
-        CodegenGlobals::get_instance().code_gc_count += 1;
+        CodegenGlobals::get_instance().context.code_gc_count += 1;
     }
 
     pub fn get_code_gc_count() -> usize {
-        CodegenGlobals::get_instance().code_gc_count
+        CodegenGlobals::get_instance().context.code_gc_count
     }
 }

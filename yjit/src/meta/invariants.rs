@@ -13,12 +13,11 @@ use crate::{
     },
     dev::options::get_option,
     dev::stats::{incr_counter, YjitExitLocations},
-    ffi::yjit_enabled_p,
     iseq::{for_each_iseq, for_each_on_stack_iseq, get_iseq_payload},
     meta::block::{BlockId, BlockRef},
     meta::jit_state::JITState,
     remove_block::{delayed_deallocation, free_block, invalidate_block_version},
-    utils::IntoUsize,
+    utils::IntoUsize, revolution::old_world::yjit_enabled_p,
 };
 
 use std::collections::{HashMap, HashSet};

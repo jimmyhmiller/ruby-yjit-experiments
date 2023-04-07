@@ -12,8 +12,7 @@ use crate::{
     codegen::{generator::CodeGenerator, globals::CodegenGlobals, CodePtr},
     core::gen_block_series,
     cruby::{
-        get_cfp_sp, get_ec_cfp, rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_set_cfp_pc, rb_set_cfp_sp,
-        src_loc, with_vm_lock, EcPtr,
+        get_cfp_sp, get_ec_cfp, rb_cfp_get_iseq, rb_iseq_pc_at_idx, rb_set_cfp_pc, rb_set_cfp_sp, EcPtr,
     },
     dev::{options::get_option, stats::incr_counter},
     meta::{
@@ -24,26 +23,12 @@ use crate::{
         context::Context,
         jit_state::JITState,
     },
-    utils::{c_callable, IntoUsize},
+    utils::IntoUsize, revolution::c_funcs::branch_stub_hit,
 };
-
-c_callable! {
-    /// Generated code calls this function with the SysV calling convention.
-    /// See [set_branch_target].
-    fn branch_stub_hit(
-        branch_ptr: *const c_void,
-        target_idx: u32,
-        ec: EcPtr,
-    ) -> *const u8 {
-        with_vm_lock(src_loc!(), || {
-            branch_stub_hit_body(branch_ptr, target_idx, ec)
-        })
-    }
-}
 
 /// Called by the generated code when a branch stub is executed
 /// Triggers compilation of branches and code patching
-fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -> *const u8 {
+pub fn branch_stub_hit_body(branch_ptr: *const c_void, target_idx: u32, ec: EcPtr) -> *const u8 {
     if get_option!(dump_insns) {
         println!("branch_stub_hit");
     }

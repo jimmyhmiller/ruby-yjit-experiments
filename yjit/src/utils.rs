@@ -129,6 +129,12 @@ macro_rules! c_callable {
         $(#[$outer])*
         extern "C" fn $f $args $(-> $ret)? $body
     };
+
+    ($(#[$outer:meta])*
+    pub fn $f:ident $args:tt $(-> $ret:ty)? $body:block) => {
+        $(#[$outer])*
+        pub extern "C" fn $f $args $(-> $ret)? $body
+    };
 }
 
 #[cfg(target_arch = "x86_64")]
