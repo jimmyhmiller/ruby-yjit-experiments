@@ -24,8 +24,6 @@ fn ensure_compiler_setup() -> &'static Mutex<CompilerInstance> {
     }
 }
 
-// get_log_file() and set_log_file() defined as with once_cell::OnceCell
-
 pub fn get_compiler<'a>() -> MutexGuard<'a, CompilerInstance> {
     ensure_compiler_setup().lock().unwrap()
 }
