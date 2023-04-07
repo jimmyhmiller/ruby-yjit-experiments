@@ -79,4 +79,32 @@ impl Compiler for Baseline {
     fn update_references(&mut self, payload: *mut std::ffi::c_void) {
         todo!()
     }
+
+    fn invalidate_callable_method_entry(&mut self, callee_cme: *const crate::cruby::CallableMethodEntry) {
+        todo!()
+    }
+
+    fn basic_operator_redefined(&mut self, klass: crate::cruby::RedefinitionFlag, bop: crate::cruby::RubyBasicOperators) {
+        todo!()
+    }
+
+    fn before_ractor_spawn(&mut self) {
+        todo!()
+    }
+
+    fn constant_state_changed(&mut self, id: crate::cruby::ID) {
+        todo!()
+    }
+
+    fn mark_root(&mut self) {
+        todo!()
+    }
+
+    fn constant_inline_cache_update(&mut self, iseq: *const crate::cruby::InstructionSequence, ic: crate::cruby::InlineCache, insn_idx: u32) {
+        todo!()
+    }
+
+    fn tracing_enabled(&mut self) {
+        todo!()
+    }
 }

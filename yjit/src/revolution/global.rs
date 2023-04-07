@@ -1,8 +1,6 @@
 use std::mem::MaybeUninit;
 use std::sync::{Mutex, MutexGuard, Once};
 
-use crate::revolution::traits::Compiler;
-
 use super::old_world::OldWorld;
 
 type CompilerInstance = OldWorld;

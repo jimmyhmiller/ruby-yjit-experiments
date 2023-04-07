@@ -199,6 +199,11 @@ pub use rb_yarv_class_of as CLASS_OF;
 pub use rb_yarv_fix_mod_fix as rb_fix_mod_fix;
 pub use rb_yarv_str_eql_internal as rb_str_eql_internal;
 
+pub type RubyBasicOperators = ruby_basic_operators;
+pub type CallableMethodEntry = rb_callable_method_entry_t;
+pub type InstructionSequence = rb_iseq_t;
+pub type InlineCache = IC;
+
 /// Helper so we can get a Rust string for insn_name()
 pub fn insn_name(opcode: usize) -> String {
     use std::ffi::CStr;

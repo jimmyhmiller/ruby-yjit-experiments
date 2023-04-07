@@ -3,8 +3,9 @@ use crate::backend::arm64::JMP_PTR_BYTES;
 #[cfg(target_arch = "x86_64")]
 use crate::backend::x86_64::JMP_PTR_BYTES;
 use crate::iseq::{for_each_off_stack_iseq_payload, for_each_on_stack_iseq_payload};
+use crate::meta::invariants;
 use crate::{
-    meta::block::IseqPayload, meta::invariants::rb_yjit_tracing_invalidate_all,
+    meta::block::IseqPayload,
     virtualmem::WriteError,
 };
 use std::cell::RefCell;
@@ -654,7 +655,7 @@ impl CodeBlock {
         // Invalidate everything to have more compact code after code GC.
         // This currently patches every ISEQ, which works, but in the future,
         // we could limit that to patch only on-stack ISEQs for optimizing code GC.
-        rb_yjit_tracing_invalidate_all();
+        invariants::tracing_invalidate_all();
 
         // Assert that all code pages are freeable
         assert_eq!(

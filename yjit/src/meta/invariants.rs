@@ -183,8 +183,7 @@ pub fn assume_stable_constant_names(code_generator: &mut CodeGenerator, idlist: 
 /// Called when a basic operator is redefined. Note that all the blocks assuming
 /// the stability of different operators are invalidated together and we don't
 /// do fine-grained tracking.
-#[no_mangle]
-pub extern "C" fn rb_yjit_bop_redefined(klass: RedefinitionFlag, bop: ruby_basic_operators) {
+pub fn bop_redefined(klass: RedefinitionFlag, bop: ruby_basic_operators) {
     // If YJIT isn't enabled, do nothing
     if !yjit_enabled_p() {
         return;
@@ -207,8 +206,7 @@ pub extern "C" fn rb_yjit_bop_redefined(klass: RedefinitionFlag, bop: ruby_basic
 
 /// Callback for when a cme becomes invalid. Invalidate all blocks that depend
 /// on the given cme being valid.
-#[no_mangle]
-pub extern "C" fn rb_yjit_cme_invalidate(callee_cme: *const rb_callable_method_entry_t) {
+pub fn cme_invalidate(callee_cme: *const rb_callable_method_entry_t) {
     // If YJIT isn't enabled, do nothing
     if !yjit_enabled_p() {
         return;
@@ -226,8 +224,7 @@ pub extern "C" fn rb_yjit_cme_invalidate(callee_cme: *const rb_callable_method_e
 
 /// Callback for then Ruby is about to spawn a ractor. In that case we need to
 /// invalidate every block that is assuming single ractor mode.
-#[no_mangle]
-pub extern "C" fn rb_yjit_before_ractor_spawn() {
+pub fn before_ractor_spawn() {
     // If YJIT isn't enabled, do nothing
     if !yjit_enabled_p() {
         return;
@@ -246,8 +243,7 @@ pub extern "C" fn rb_yjit_before_ractor_spawn() {
 }
 
 /// Callback for when the global constant state changes.
-#[no_mangle]
-pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
+pub fn constant_state_changed(id: ID) {
     // If YJIT isn't enabled, do nothing
     if !yjit_enabled_p() {
         return;
@@ -287,8 +283,7 @@ pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
 
 /// Callback for marking GC objects inside [Invariants].
 /// See `struct yjijt_root_struct` in C.
-#[no_mangle]
-pub extern "C" fn rb_yjit_root_mark() {
+pub fn root_mark() {
     // Call rb_gc_mark on exit location's raw_samples to
     // wrap frames in a GC allocated object. This needs to be called
     // at the same time as root mark.
@@ -388,8 +383,7 @@ pub fn block_assumptions_free(blockref: &BlockRef) {
 /// Callback from the opt_setinlinecache instruction in the interpreter.
 /// Invalidate the block for the matching opt_getinlinecache so it could regenerate code
 /// using the new value in the constant cache.
-#[no_mangle]
-pub extern "C" fn rb_yjit_constant_ic_update(iseq: *const rb_iseq_t, ic: IC, insn_idx: u32) {
+pub fn constant_ic_update(iseq: *const rb_iseq_t, ic: IC, insn_idx: u32) {
     // If YJIT isn't enabled, do nothing
     if !yjit_enabled_p() {
         return;
@@ -460,8 +454,7 @@ pub extern "C" fn rb_yjit_constant_ic_update(iseq: *const rb_iseq_t, ic: IC, ins
 //
 // In addition to patching, we prevent future entries into invalidated code by
 // removing all live blocks from their iseq.
-#[no_mangle]
-pub extern "C" fn rb_yjit_tracing_invalidate_all() {
+pub fn tracing_invalidate_all() {
     if !yjit_enabled_p() {
         return;
     }

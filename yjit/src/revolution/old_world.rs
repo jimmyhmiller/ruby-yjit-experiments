@@ -17,7 +17,7 @@ use crate::{
         stats::{incr_counter, YjitExitLocations},
     },
     entry_point::gen_entry_point,
-    meta::{block::IseqPayload, invariants::Invariants},
+    meta::{block::IseqPayload, invariants::{Invariants, self}},
     remove_block::free_block,
     utils::IntoUsize,
 };
@@ -290,6 +290,34 @@ impl Compiler for OldWorld {
         CodegenGlobals::with_outlined_cb(|ocb| {
             ocb.unwrap().mark_all_executable();
         });
+    }
+
+    fn invalidate_callable_method_entry(&mut self, callee_cme: *const crate::cruby::CallableMethodEntry) {
+        invariants::cme_invalidate(callee_cme);
+    }
+
+    fn basic_operator_redefined(&mut self, klass: crate::cruby::RedefinitionFlag, bop: crate::cruby::RubyBasicOperators) {
+        invariants::bop_redefined(klass, bop);
+    }
+
+    fn before_ractor_spawn(&mut self) {
+        invariants::before_ractor_spawn();
+    }
+
+    fn constant_state_changed(&mut self, id: crate::cruby::ID) {
+        invariants::constant_state_changed(id);
+    }
+
+    fn mark_root(&mut self) {
+        invariants::root_mark();
+    }
+
+    fn constant_inline_cache_update(&mut self, iseq: *const crate::cruby::InstructionSequence, ic: crate::cruby::InlineCache, insn_idx: u32) {
+        invariants::constant_ic_update(iseq, ic, insn_idx);
+    }
+
+    fn tracing_enabled(&mut self) {
+        invariants::tracing_invalidate_all();
     }
 }
 
