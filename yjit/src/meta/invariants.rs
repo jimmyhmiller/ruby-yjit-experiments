@@ -253,20 +253,15 @@ pub fn constant_state_changed(id: ID) {
         if get_option!(global_constant_state) {
             // If the global-constant-state option is set, then we're going to
             // invalidate every block that depends on any constant.
+            let constant_state_blocks = &mut Invariants::get_instance().constant_state_blocks;
 
-            Invariants::get_instance()
-                .constant_state_blocks
-                .keys()
-                .for_each(|id| {
-                    if let Some(blocks) =
-                        Invariants::get_instance().constant_state_blocks.remove(id)
-                    {
-                        for block in &blocks {
-                            invalidate_block_version(block);
-                            incr_counter!(invalidate_constant_state_bump);
-                        }
-                    }
-                });
+            constant_state_blocks.iter().for_each(|(_id, blocks)| {
+                for block in blocks.iter() {
+                    invalidate_block_version(block);
+                    incr_counter!(invalidate_constant_state_bump);
+                }
+            });
+            constant_state_blocks.clear();
         } else {
             // If the global-constant-state option is not set, then we're only going
             // to invalidate the blocks that are associated with the given ID.
