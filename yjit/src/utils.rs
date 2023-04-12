@@ -144,6 +144,11 @@ macro_rules! c_callable {
         $(#[$outer])*
         extern "sysv64" fn $f $args $(-> $ret)? $body
     };
+    ($(#[$outer:meta])*
+    pub fn $f:ident $args:tt $(-> $ret:ty)? $body:block) => {
+        $(#[$outer])*
+        pub extern "sysv64" fn $f $args $(-> $ret)? $body
+    };
 }
 pub(crate) use c_callable;
 
