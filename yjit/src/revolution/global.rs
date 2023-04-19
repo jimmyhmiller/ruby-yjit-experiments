@@ -41,9 +41,3 @@ pub fn get_compiler<'a>(reason: &str) -> MutexGuard<'a, CompilerInstance> {
         }
     }
 }
-
-pub fn get_compiler_with_vm_lock<'a>(reason: &str) -> MutexGuard<'a, CompilerInstance> {
-    with_vm_lock(src_loc!(), || {
-        get_compiler(&format!("with_lock {}", reason))
-    })
-}

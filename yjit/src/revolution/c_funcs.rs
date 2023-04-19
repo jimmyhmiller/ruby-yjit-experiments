@@ -2,13 +2,13 @@ use std::{ffi::c_void, os::raw};
 
 use crate::{
     cruby::{
-        CallableMethodEntry, EcPtr, InlineCache, InstructionSequence, IseqPtr, RedefinitionFlag,
-        RubyBasicOperators, IC, ID, VALUE,
+        src_loc, with_vm_lock, CallableMethodEntry, EcPtr, InlineCache, InstructionSequence,
+        IseqPtr, RedefinitionFlag, RubyBasicOperators, IC, ID, VALUE,
     },
     utils::c_callable,
 };
 
-use super::global::{get_compiler, CompilerInstance, get_compiler_with_vm_lock};
+use super::global::{get_compiler, CompilerInstance};
 use super::traits::Compiler;
 
 /// Called from C code to begin compiling a function
@@ -26,7 +26,9 @@ c_callable! {
         target_idx: u32,
         ec: EcPtr,
     ) -> *const u8 {
-        get_compiler_with_vm_lock("stub_hit").stub_hit(branch_ptr, target_idx, ec)
+        with_vm_lock(src_loc!(), || {
+            get_compiler("stub_hit").stub_hit(branch_ptr, target_idx, ec)
+        })
     }
 }
 
@@ -72,20 +74,22 @@ pub extern "C" fn rb_yjit_simulate_oom_bang(ec: EcPtr, ruby_self: VALUE) -> VALU
 /// Free the per-iseq payload
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_free(payload: *mut c_void) {
-    get_compiler_with_vm_lock("free").free(payload)
+    with_vm_lock(src_loc!(), || get_compiler("free").free(payload))
 }
 
 /// GC callback for marking GC objects in the the per-iseq payload.
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_mark(payload: *mut c_void) {
-    get_compiler_with_vm_lock("mark").mark(payload)
+    with_vm_lock(src_loc!(), || get_compiler("mark").mark(payload))
 }
 
 /// GC callback for updating GC objects in the the per-iseq payload.
 /// This is a mirror of [rb_yjit_iseq_mark].
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
-    get_compiler_with_vm_lock("update").update_references(payload)
+    with_vm_lock(src_loc!(), || {
+        get_compiler("update").update_references(payload)
+    })
 }
 
 #[no_mangle]
@@ -95,22 +99,30 @@ pub extern "C" fn rb_yjit_bop_redefined(klass: RedefinitionFlag, bop: RubyBasicO
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_cme_invalidate(callee_cme: *const CallableMethodEntry) {
-    get_compiler_with_vm_lock("cme").invalidate_callable_method_entry(callee_cme);
+    with_vm_lock(src_loc!(), || {
+        get_compiler("cme").invalidate_callable_method_entry(callee_cme);
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_before_ractor_spawn() {
-    get_compiler_with_vm_lock("before").before_ractor_spawn();
+    with_vm_lock(src_loc!(), || {
+        get_compiler("before").before_ractor_spawn();
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
-    get_compiler_with_vm_lock("constant").constant_state_changed(id);
+    with_vm_lock(src_loc!(), || {
+        get_compiler("constant").constant_state_changed(id);
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_root_mark() {
-    get_compiler_with_vm_lock("root mark").mark_root();
+    with_vm_lock(src_loc!(), || {
+        get_compiler("root mark").mark_root();
+    })
 }
 
 #[no_mangle]
@@ -119,10 +131,14 @@ pub extern "C" fn rb_yjit_constant_ic_update(
     ic: InlineCache,
     insn_idx: u32,
 ) {
-    get_compiler_with_vm_lock("inline cache").constant_inline_cache_update(iseq, ic, insn_idx);
+    with_vm_lock(src_loc!(), || {
+        get_compiler("inline cache").constant_inline_cache_update(iseq, ic, insn_idx);
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_tracing_invalidate_all() {
-    get_compiler_with_vm_lock("tracing").tracing_enabled();
+    with_vm_lock(src_loc!(), || {
+        get_compiler("tracing").tracing_enabled();
+    })
 }
