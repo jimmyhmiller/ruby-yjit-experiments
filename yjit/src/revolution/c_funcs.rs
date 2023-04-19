@@ -26,7 +26,7 @@ c_callable! {
         target_idx: u32,
         ec: EcPtr,
     ) -> *const u8 {
-        get_compiler("stub_hit").stub_hit(branch_ptr, target_idx, ec)
+        get_compiler_with_vm_lock("stub_hit").stub_hit(branch_ptr, target_idx, ec)
     }
 }
 

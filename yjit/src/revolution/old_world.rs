@@ -91,9 +91,7 @@ impl Compiler for OldWorld {
         target_idx: u32,
         ec: crate::cruby::EcPtr,
     ) -> *const u8 {
-        with_vm_lock(src_loc!(), || {
-            branch_stub_hit_body(branch_ptr, target_idx, ec)
-        })
+        branch_stub_hit_body(branch_ptr, target_idx, ec)
     }
 
     fn parse_options(str_ptr: *const std::os::raw::c_char) -> bool {
