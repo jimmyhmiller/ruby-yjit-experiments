@@ -119,10 +119,10 @@ pub extern "C" fn rb_yjit_constant_ic_update(
     ic: InlineCache,
     insn_idx: u32,
 ) {
-    get_compiler("inline cache").constant_inline_cache_update(iseq, ic, insn_idx);
+    get_compiler_with_vm_lock("inline cache").constant_inline_cache_update(iseq, ic, insn_idx);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_tracing_invalidate_all() {
-    get_compiler("tracing").tracing_enabled();
+    get_compiler_with_vm_lock("tracing").tracing_enabled();
 }
