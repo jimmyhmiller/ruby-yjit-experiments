@@ -25,5 +25,5 @@ fn ensure_compiler_setup() -> &'static Mutex<CompilerInstance> {
 }
 
 pub fn get_compiler<'a>() -> MutexGuard<'a, CompilerInstance> {
-    ensure_compiler_setup().lock().unwrap()
+    ensure_compiler_setup().try_lock().unwrap()
 }
