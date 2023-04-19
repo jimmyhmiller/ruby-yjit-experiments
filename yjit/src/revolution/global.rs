@@ -1,5 +1,6 @@
 use std::mem::MaybeUninit;
 use std::sync::{Mutex, MutexGuard, Once};
+use std::thread;
 
 use crate::cruby::{with_vm_lock, src_loc};
 
@@ -33,11 +34,11 @@ pub fn get_compiler<'a>(reason: &str) -> MutexGuard<'a, CompilerInstance> {
     let compiler = ensure_compiler_setup().try_lock();
     match compiler {
         Ok(compiler) => {
-            unsafe { REASON = reason.to_string() };
+            unsafe { REASON = format!("{:?}, {}", thread::current().id(), reason) };
             return compiler;
         }
         Err(_) => {
-            panic!("Tried to lock for {} but already locked for {}", reason, unsafe { REASON.clone() })
+            panic!("Tried to lock for {:?} {} but already locked for {}", thread::current().id(), reason, unsafe { REASON.clone() })
         }
     }
 }
