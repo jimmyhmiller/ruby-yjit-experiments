@@ -15,7 +15,7 @@ use super::traits::Compiler;
 /// NOTE: this should be wrapped in RB_VM_LOCK_ENTER(), rb_vm_barrier() on the C side
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_gen_entry_point(iseq: IseqPtr, ec: EcPtr) -> *const u8 {
-    get_compiler().entry_point(iseq, ec)
+    get_compiler("entry_point").entry_point(iseq, ec)
 }
 
 c_callable! {
@@ -26,7 +26,7 @@ c_callable! {
         target_idx: u32,
         ec: EcPtr,
     ) -> *const u8 {
-        get_compiler().stub_hit(branch_ptr, target_idx, ec)
+        get_compiler("stub_hit").stub_hit(branch_ptr, target_idx, ec)
     }
 }
 
@@ -54,63 +54,63 @@ pub extern "C" fn rb_yjit_call_threshold() -> raw::c_uint {
 /// This function is called from C code
 #[no_mangle]
 pub extern "C" fn rb_yjit_init_rust() {
-    get_compiler().init();
+    get_compiler("init").init();
 }
 
 /// Free and recompile all existing JIT code
 #[no_mangle]
 pub extern "C" fn rb_yjit_code_gc(ec: EcPtr, ruby_self: VALUE) -> VALUE {
-    get_compiler().code_gc(ec, ruby_self)
+    get_compiler("gc").code_gc(ec, ruby_self)
 }
 
 /// Simulate a situation where we are out of executable memory
 #[no_mangle]
 pub extern "C" fn rb_yjit_simulate_oom_bang(ec: EcPtr, ruby_self: VALUE) -> VALUE {
-    get_compiler().simulate_out_of_memory(ec, ruby_self)
+    get_compiler("simulate").simulate_out_of_memory(ec, ruby_self)
 }
 
 /// Free the per-iseq payload
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_free(payload: *mut c_void) {
-    get_compiler().free(payload)
+    get_compiler("free").free(payload)
 }
 
 /// GC callback for marking GC objects in the the per-iseq payload.
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_mark(payload: *mut c_void) {
-    get_compiler().mark(payload)
+    get_compiler("mark").mark(payload)
 }
 
 /// GC callback for updating GC objects in the the per-iseq payload.
 /// This is a mirror of [rb_yjit_iseq_mark].
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
-    get_compiler().update_references(payload)
+    get_compiler("update").update_references(payload)
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_bop_redefined(klass: RedefinitionFlag, bop: RubyBasicOperators) {
-    get_compiler().basic_operator_redefined(klass, bop);
+    get_compiler("redefined").basic_operator_redefined(klass, bop);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_cme_invalidate(callee_cme: *const CallableMethodEntry) {
-    get_compiler().invalidate_callable_method_entry(callee_cme);
+    get_compiler("cme").invalidate_callable_method_entry(callee_cme);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_before_ractor_spawn() {
-    get_compiler().before_ractor_spawn();
+    get_compiler("before").before_ractor_spawn();
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
-    get_compiler().constant_state_changed(id);
+    get_compiler("constant").constant_state_changed(id);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_root_mark() {
-    get_compiler().mark_root();
+    get_compiler("root mark").mark_root();
 }
 
 #[no_mangle]
@@ -119,10 +119,10 @@ pub extern "C" fn rb_yjit_constant_ic_update(
     ic: InlineCache,
     insn_idx: u32,
 ) {
-    get_compiler().constant_inline_cache_update(iseq, ic, insn_idx);
+    get_compiler("inline cache").constant_inline_cache_update(iseq, ic, insn_idx);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_tracing_invalidate_all() {
-    get_compiler().tracing_enabled();
+    get_compiler("tracing").tracing_enabled();
 }
