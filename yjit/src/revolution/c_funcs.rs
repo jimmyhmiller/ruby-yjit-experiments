@@ -8,7 +8,7 @@ use crate::{
     utils::c_callable,
 };
 
-use super::global::get_compiler;
+use super::global::{get_compiler, CompilerInstance};
 use super::traits::Compiler;
 
 /// Called from C code to begin compiling a function
@@ -42,7 +42,7 @@ pub extern "C" fn rb_yjit_parse_option(str_ptr: *const raw::c_char) -> bool {
 /// This is used frequently since it's used on every method call in the interpreter.
 #[no_mangle]
 pub extern "C" fn rb_yjit_enabled_p() -> bool {
-    get_compiler().enabled()
+    CompilerInstance::enabled()
 }
 
 /// After how many calls YJIT starts compiling a method

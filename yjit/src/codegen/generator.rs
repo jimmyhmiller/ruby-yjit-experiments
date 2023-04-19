@@ -6,8 +6,6 @@ use std::os::raw::c_int;
 use std::ptr;
 use std::slice;
 
-use crate::dev::stats::counted_exit;
-use crate::dev::stats::gen_counter_incr;
 pub use crate::virtualmem::CodePtr;
 
 use crate::{
@@ -82,7 +80,7 @@ use crate::{
     },
     dev::{
         options::get_option,
-        stats::{incr_counter, ptr_to_counter},
+        stats::{counted_exit, gen_counter_incr, incr_counter, ptr_to_counter},
     },
     meta::{
         block::{Block, BlockId, BranchGenFn, BranchShape},
@@ -90,7 +88,7 @@ use crate::{
         context::{Context, Type, TypeDiff, YARVOpnd},
         invariants::{
             assume_method_lookup_stable, assume_single_ractor_mode, assume_stable_constant_names,
-            Invariants,
+            track_basic_operator_with_block,
         },
         jit_state::JITState,
     },
@@ -212,18 +210,8 @@ impl CodeGenerator {
     ) -> bool {
         if unsafe { BASIC_OP_UNREDEFINED_P(bop, klass) } {
             self.jit_ensure_block_entry_exit();
-
-            let invariants = Invariants::get_instance();
-            invariants
-                .basic_operator_blocks
-                .entry((klass, bop))
-                .or_default()
-                .insert(self.jit.get_block());
-            invariants
-                .block_basic_operators
-                .entry(self.jit.get_block())
-                .or_default()
-                .insert((klass, bop));
+            let block = self.jit.get_block();
+            track_basic_operator_with_block(klass, bop, block);
 
             true
         } else {

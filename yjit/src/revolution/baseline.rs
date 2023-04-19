@@ -44,7 +44,7 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn enabled(&mut self) -> bool {
+    fn enabled() -> bool {
         todo!()
     }
 

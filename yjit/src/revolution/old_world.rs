@@ -100,7 +100,7 @@ impl Compiler for OldWorld {
         parse_option(str_ptr).is_some()
     }
 
-    fn enabled(&mut self) -> bool {
+    fn enabled() -> bool {
         // Note that we might want to call this function from signal handlers so
         // might need to ensure signal-safety(7).
         YJIT_ENABLED.load(Ordering::Acquire).into()

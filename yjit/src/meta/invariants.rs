@@ -516,3 +516,17 @@ pub fn tracing_invalidate_all() {
         });
     });
 }
+
+pub fn track_basic_operator_with_block(klass: u32, bop: u32, block: crate::meta::block::BlockRef) {
+    let invariants = Invariants::get_instance();
+    invariants
+        .basic_operator_blocks
+        .entry((klass, bop))
+        .or_default()
+        .insert(block.clone());
+    invariants
+        .block_basic_operators
+        .entry(block)
+        .or_default()
+        .insert((klass, bop));
+}

@@ -3,7 +3,7 @@ use std::sync::{Mutex, MutexGuard, Once};
 
 use super::old_world::OldWorld;
 
-type CompilerInstance = OldWorld;
+pub type CompilerInstance = OldWorld;
 
 // I could make this dynamic. But probably no good use for that right now.
 // I can imagine a Compiler implementation that abstracts over multiple though
