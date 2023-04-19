@@ -96,7 +96,7 @@ impl Compiler for OldWorld {
         })
     }
 
-    fn parse_options(&mut self, str_ptr: *const std::os::raw::c_char) -> bool {
+    fn parse_options(str_ptr: *const std::os::raw::c_char) -> bool {
         parse_option(str_ptr).is_some()
     }
 
@@ -106,7 +106,7 @@ impl Compiler for OldWorld {
         YJIT_ENABLED.load(Ordering::Acquire).into()
     }
 
-    fn call_threshold(&mut self) -> std::os::raw::c_uint {
+    fn call_threshold() -> std::os::raw::c_uint {
         get_option!(call_threshold) as raw::c_uint
     }
 

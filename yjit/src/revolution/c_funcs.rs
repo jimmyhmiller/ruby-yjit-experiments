@@ -34,7 +34,7 @@ c_callable! {
 /// This is called from ruby.c
 #[no_mangle]
 pub extern "C" fn rb_yjit_parse_option(str_ptr: *const raw::c_char) -> bool {
-    get_compiler().parse_options(str_ptr)
+    CompilerInstance::parse_options(str_ptr)
 }
 
 /// Is YJIT on? The interpreter uses this function to decide whether to increment
@@ -48,7 +48,7 @@ pub extern "C" fn rb_yjit_enabled_p() -> bool {
 /// After how many calls YJIT starts compiling a method
 #[no_mangle]
 pub extern "C" fn rb_yjit_call_threshold() -> raw::c_uint {
-    get_compiler().call_threshold()
+    CompilerInstance::call_threshold()
 }
 
 /// This function is called from C code

@@ -40,7 +40,7 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn parse_options(&mut self, str_ptr: *const raw::c_char) -> bool {
+    fn parse_options(str_ptr: *const raw::c_char) -> bool {
         todo!()
     }
 
@@ -48,7 +48,7 @@ impl Compiler for Baseline {
         todo!()
     }
 
-    fn call_threshold(&mut self) -> raw::c_uint {
+    fn call_threshold() -> raw::c_uint {
         todo!()
     }
 
