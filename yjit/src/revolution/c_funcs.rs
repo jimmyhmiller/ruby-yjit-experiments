@@ -8,7 +8,7 @@ use crate::{
     utils::c_callable,
 };
 
-use super::global::{get_compiler, CompilerInstance};
+use super::global::{get_compiler, CompilerInstance, get_compiler_with_vm_lock};
 use super::traits::Compiler;
 
 /// Called from C code to begin compiling a function
@@ -72,20 +72,20 @@ pub extern "C" fn rb_yjit_simulate_oom_bang(ec: EcPtr, ruby_self: VALUE) -> VALU
 /// Free the per-iseq payload
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_free(payload: *mut c_void) {
-    get_compiler("free").free(payload)
+    get_compiler_with_vm_lock("free").free(payload)
 }
 
 /// GC callback for marking GC objects in the the per-iseq payload.
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_mark(payload: *mut c_void) {
-    get_compiler("mark").mark(payload)
+    get_compiler_with_vm_lock("mark").mark(payload)
 }
 
 /// GC callback for updating GC objects in the the per-iseq payload.
 /// This is a mirror of [rb_yjit_iseq_mark].
 #[no_mangle]
 pub extern "C" fn rb_yjit_iseq_update_references(payload: *mut c_void) {
-    get_compiler("update").update_references(payload)
+    get_compiler_with_vm_lock("update").update_references(payload)
 }
 
 #[no_mangle]
@@ -95,22 +95,22 @@ pub extern "C" fn rb_yjit_bop_redefined(klass: RedefinitionFlag, bop: RubyBasicO
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_cme_invalidate(callee_cme: *const CallableMethodEntry) {
-    get_compiler("cme").invalidate_callable_method_entry(callee_cme);
+    get_compiler_with_vm_lock("cme").invalidate_callable_method_entry(callee_cme);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_before_ractor_spawn() {
-    get_compiler("before").before_ractor_spawn();
+    get_compiler_with_vm_lock("before").before_ractor_spawn();
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_constant_state_changed(id: ID) {
-    get_compiler("constant").constant_state_changed(id);
+    get_compiler_with_vm_lock("constant").constant_state_changed(id);
 }
 
 #[no_mangle]
 pub extern "C" fn rb_yjit_root_mark() {
-    get_compiler("root mark").mark_root();
+    get_compiler_with_vm_lock("root mark").mark_root();
 }
 
 #[no_mangle]

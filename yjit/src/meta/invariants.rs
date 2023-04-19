@@ -8,7 +8,7 @@ use crate::{
         get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL, rb_callable_method_entry,
         rb_callable_method_entry_t, rb_gc_mark, rb_iseq_reset_jit_func, rb_iseq_t,
         rb_method_basic_definition_p, rb_vm_insn_decode, rb_yjit_multi_ractor_p,
-        ruby_basic_operators, src_loc, with_vm_lock, RedefinitionFlag,
+        ruby_basic_operators, RedefinitionFlag,
         YARVINSN_opt_getconstant_path, FL_TEST, IC, ID, ISEQ_TRANSLATED, VALUE,
     },
     dev::options::get_option,
@@ -189,19 +189,17 @@ pub fn bop_redefined(klass: RedefinitionFlag, bop: ruby_basic_operators) {
         return;
     }
 
-    with_vm_lock(src_loc!(), || {
-        // Loop through the blocks that are associated with this class and basic
-        // operator and invalidate them.
-        if let Some(blocks) = Invariants::get_instance()
-            .basic_operator_blocks
-            .remove(&(klass, bop))
-        {
-            for block in blocks.iter() {
-                invalidate_block_version(block);
-                incr_counter!(invalidate_bop_redefined);
-            }
+    // Loop through the blocks that are associated with this class and basic
+    // operator and invalidate them.
+    if let Some(blocks) = Invariants::get_instance()
+        .basic_operator_blocks
+        .remove(&(klass, bop))
+    {
+        for block in blocks.iter() {
+            invalidate_block_version(block);
+            incr_counter!(invalidate_bop_redefined);
         }
-    });
+    }
 }
 
 /// Callback for when a cme becomes invalid. Invalidate all blocks that depend
@@ -212,14 +210,12 @@ pub fn cme_invalidate(callee_cme: *const rb_callable_method_entry_t) {
         return;
     }
 
-    with_vm_lock(src_loc!(), || {
-        if let Some(blocks) = Invariants::get_instance().cme_validity.remove(&callee_cme) {
-            for block in blocks.iter() {
-                invalidate_block_version(block);
-                incr_counter!(invalidate_method_lookup);
-            }
+    if let Some(blocks) = Invariants::get_instance().cme_validity.remove(&callee_cme) {
+        for block in blocks.iter() {
+            invalidate_block_version(block);
+            incr_counter!(invalidate_method_lookup);
         }
-    });
+    }
 }
 
 /// Callback for then Ruby is about to spawn a ractor. In that case we need to
@@ -230,16 +226,14 @@ pub fn before_ractor_spawn() {
         return;
     }
 
-    with_vm_lock(src_loc!(), || {
-        // Clear the set of blocks inside Invariants
-        let blocks = mem::take(&mut Invariants::get_instance().single_ractor);
+    // Clear the set of blocks inside Invariants
+    let blocks = mem::take(&mut Invariants::get_instance().single_ractor);
 
-        // Invalidate the blocks
-        for block in &blocks {
-            invalidate_block_version(block);
-            incr_counter!(invalidate_ractor_spawn);
-        }
-    });
+    // Invalidate the blocks
+    for block in &blocks {
+        invalidate_block_version(block);
+        incr_counter!(invalidate_ractor_spawn);
+    }
 }
 
 /// Callback for when the global constant state changes.
@@ -249,31 +243,29 @@ pub fn constant_state_changed(id: ID) {
         return;
     }
 
-    with_vm_lock(src_loc!(), || {
-        if get_option!(global_constant_state) {
-            // If the global-constant-state option is set, then we're going to
-            // invalidate every block that depends on any constant.
-            let constant_state_blocks = &mut Invariants::get_instance().constant_state_blocks;
+    if get_option!(global_constant_state) {
+        // If the global-constant-state option is set, then we're going to
+        // invalidate every block that depends on any constant.
+        let constant_state_blocks = &mut Invariants::get_instance().constant_state_blocks;
 
-            constant_state_blocks.iter().for_each(|(_id, blocks)| {
-                for block in blocks.iter() {
-                    invalidate_block_version(block);
-                    incr_counter!(invalidate_constant_state_bump);
-                }
-            });
-            constant_state_blocks.clear();
-        } else {
-            // If the global-constant-state option is not set, then we're only going
-            // to invalidate the blocks that are associated with the given ID.
+        constant_state_blocks.iter().for_each(|(_id, blocks)| {
+            for block in blocks.iter() {
+                invalidate_block_version(block);
+                incr_counter!(invalidate_constant_state_bump);
+            }
+        });
+        constant_state_blocks.clear();
+    } else {
+        // If the global-constant-state option is not set, then we're only going
+        // to invalidate the blocks that are associated with the given ID.
 
-            if let Some(blocks) = Invariants::get_instance().constant_state_blocks.remove(&id) {
-                for block in &blocks {
-                    invalidate_block_version(block);
-                    incr_counter!(invalidate_constant_state_bump);
-                }
+        if let Some(blocks) = Invariants::get_instance().constant_state_blocks.remove(&id) {
+            for block in &blocks {
+                invalidate_block_version(block);
+                incr_counter!(invalidate_constant_state_bump);
             }
         }
-    });
+    }
 }
 
 /// Callback for marking GC objects inside [Invariants].
@@ -390,43 +382,41 @@ pub fn constant_ic_update(iseq: *const rb_iseq_t, ic: IC, insn_idx: u32) {
         return;
     }
 
-    with_vm_lock(src_loc!(), || {
-        let code = unsafe { get_iseq_body_iseq_encoded(iseq) };
+    let code = unsafe { get_iseq_body_iseq_encoded(iseq) };
 
-        // This should come from a running iseq, so direct threading translation
-        // should have been done
-        assert!(unsafe { FL_TEST(iseq.into(), VALUE(ISEQ_TRANSLATED)) } != VALUE(0));
-        assert!(insn_idx < unsafe { get_iseq_encoded_size(iseq) });
+    // This should come from a running iseq, so direct threading translation
+    // should have been done
+    assert!(unsafe { FL_TEST(iseq.into(), VALUE(ISEQ_TRANSLATED)) } != VALUE(0));
+    assert!(insn_idx < unsafe { get_iseq_encoded_size(iseq) });
 
-        // Ensure that the instruction the insn_idx is pointing to is in
-        // fact a opt_getconstant_path instruction.
-        assert_eq!(
-            unsafe {
-                let opcode_pc = code.add(insn_idx.into_usize());
-                let translated_opcode: VALUE = opcode_pc.read();
-                rb_vm_insn_decode(translated_opcode)
-            },
-            YARVINSN_opt_getconstant_path.try_into().unwrap()
-        );
+    // Ensure that the instruction the insn_idx is pointing to is in
+    // fact a opt_getconstant_path instruction.
+    assert_eq!(
+        unsafe {
+            let opcode_pc = code.add(insn_idx.into_usize());
+            let translated_opcode: VALUE = opcode_pc.read();
+            rb_vm_insn_decode(translated_opcode)
+        },
+        YARVINSN_opt_getconstant_path.try_into().unwrap()
+    );
 
-        // Find the matching opt_getinlinecache and invalidate all the blocks there
-        // RUBY_ASSERT(insn_op_type(BIN(opt_getinlinecache), 1) == TS_IC);
+    // Find the matching opt_getinlinecache and invalidate all the blocks there
+    // RUBY_ASSERT(insn_op_type(BIN(opt_getinlinecache), 1) == TS_IC);
 
-        let ic_pc = unsafe { code.add(insn_idx.into_usize() + 1) };
-        let ic_operand: IC = unsafe { ic_pc.read() }.as_mut_ptr();
+    let ic_pc = unsafe { code.add(insn_idx.into_usize() + 1) };
+    let ic_operand: IC = unsafe { ic_pc.read() }.as_mut_ptr();
 
-        if ic == ic_operand {
-            for block in take_version_list(BlockId {
-                iseq,
-                idx: insn_idx,
-            }) {
-                invalidate_block_version(&block);
-                incr_counter!(invalidate_constant_ic_fill);
-            }
-        } else {
-            panic!("ic->get_insn_index not set properly");
+    if ic == ic_operand {
+        for block in take_version_list(BlockId {
+            iseq,
+            idx: insn_idx,
+        }) {
+            invalidate_block_version(&block);
+            incr_counter!(invalidate_constant_ic_fill);
         }
-    });
+    } else {
+        panic!("ic->get_insn_index not set properly");
+    }
 }
 
 // Invalidate all generated code and patch C method return code to contain
@@ -454,66 +444,63 @@ pub fn tracing_invalidate_all() {
         return;
     }
 
-    // Stop other ractors since we are going to patch machine code.
-    with_vm_lock(src_loc!(), || {
-        // Make it so all live block versions are no longer valid branch targets
-        let mut on_stack_iseqs = HashSet::new();
-        for_each_on_stack_iseq(|iseq| {
-            on_stack_iseqs.insert(iseq);
-        });
-        for_each_iseq(|iseq| {
-            if let Some(payload) = get_iseq_payload(iseq) {
-                let blocks = payload.take_all_blocks();
+    // Make it so all live block versions are no longer valid branch targets
+    let mut on_stack_iseqs = HashSet::new();
+    for_each_on_stack_iseq(|iseq| {
+        on_stack_iseqs.insert(iseq);
+    });
+    for_each_iseq(|iseq| {
+        if let Some(payload) = get_iseq_payload(iseq) {
+            let blocks = payload.take_all_blocks();
 
-                if on_stack_iseqs.contains(&iseq) {
-                    // This ISEQ is running, so we can't free blocks immediately
-                    for block in blocks {
-                        delayed_deallocation(&block);
-                    }
-                    payload.dead_blocks.shrink_to_fit();
-                } else {
-                    // Safe to free dead blocks since the ISEQ isn't running
-                    for block in blocks {
-                        free_block(&block);
-                    }
-                    mem::take(&mut payload.dead_blocks)
-                        .iter()
-                        .for_each(free_block);
+            if on_stack_iseqs.contains(&iseq) {
+                // This ISEQ is running, so we can't free blocks immediately
+                for block in blocks {
+                    delayed_deallocation(&block);
                 }
+                payload.dead_blocks.shrink_to_fit();
+            } else {
+                // Safe to free dead blocks since the ISEQ isn't running
+                for block in blocks {
+                    free_block(&block);
+                }
+                mem::take(&mut payload.dead_blocks)
+                    .iter()
+                    .for_each(free_block);
             }
-
-            // Reset output code entry point
-            unsafe { rb_iseq_reset_jit_func(iseq) };
-        });
-
-        let cb = CodegenGlobals::get_inline_cb();
-
-        // Apply patches
-        let old_pos = cb.get_write_pos();
-        let old_dropped_bytes = cb.has_dropped_bytes();
-        let mut patches = CodegenGlobals::take_global_inval_patches();
-        patches.sort_by_cached_key(|patch| patch.inline_patch_pos.raw_ptr());
-        let mut last_patch_end = std::ptr::null();
-        for patch in &patches {
-            assert!(
-                last_patch_end <= patch.inline_patch_pos.raw_ptr(),
-                "patches should not overlap"
-            );
-
-            let mut asm = crate::backend::ir::Assembler::new();
-            asm.jmp(patch.outlined_target_pos.as_side_exit());
-
-            cb.set_write_ptr(patch.inline_patch_pos);
-            cb.set_dropped_bytes(false);
-            asm.compile(cb);
-            last_patch_end = cb.get_write_ptr().raw_ptr();
         }
-        cb.set_pos(old_pos);
-        cb.set_dropped_bytes(old_dropped_bytes);
 
-        CodegenGlobals::with_outlined_cb(|ocb| {
-            ocb.unwrap().mark_all_executable();
-        });
+        // Reset output code entry point
+        unsafe { rb_iseq_reset_jit_func(iseq) };
+    });
+
+    let cb = CodegenGlobals::get_inline_cb();
+
+    // Apply patches
+    let old_pos = cb.get_write_pos();
+    let old_dropped_bytes = cb.has_dropped_bytes();
+    let mut patches = CodegenGlobals::take_global_inval_patches();
+    patches.sort_by_cached_key(|patch| patch.inline_patch_pos.raw_ptr());
+    let mut last_patch_end = std::ptr::null();
+    for patch in &patches {
+        assert!(
+            last_patch_end <= patch.inline_patch_pos.raw_ptr(),
+            "patches should not overlap"
+        );
+
+        let mut asm = crate::backend::ir::Assembler::new();
+        asm.jmp(patch.outlined_target_pos.as_side_exit());
+
+        cb.set_write_ptr(patch.inline_patch_pos);
+        cb.set_dropped_bytes(false);
+        asm.compile(cb);
+        last_patch_end = cb.get_write_ptr().raw_ptr();
+    }
+    cb.set_pos(old_pos);
+    cb.set_dropped_bytes(old_dropped_bytes);
+
+    CodegenGlobals::with_outlined_cb(|ocb| {
+        ocb.unwrap().mark_all_executable();
     });
 }
 

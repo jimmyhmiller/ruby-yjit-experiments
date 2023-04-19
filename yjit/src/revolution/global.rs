@@ -1,6 +1,8 @@
 use std::mem::MaybeUninit;
 use std::sync::{Mutex, MutexGuard, Once};
 
+use crate::cruby::{with_vm_lock, src_loc};
+
 use super::old_world::OldWorld;
 
 pub type CompilerInstance = OldWorld;
@@ -27,6 +29,7 @@ fn ensure_compiler_setup() -> &'static Mutex<CompilerInstance> {
 static mut REASON : String = String::new();
 
 pub fn get_compiler<'a>(reason: &str) -> MutexGuard<'a, CompilerInstance> {
+    
     let compiler = ensure_compiler_setup().try_lock();
     match compiler {
         Ok(compiler) => {
@@ -37,4 +40,10 @@ pub fn get_compiler<'a>(reason: &str) -> MutexGuard<'a, CompilerInstance> {
             panic!("Tried to lock for {} but already locked for {}", reason, unsafe { REASON.clone() })
         }
     }
+}
+
+pub fn get_compiler_with_vm_lock<'a>(reason: &str) -> MutexGuard<'a, CompilerInstance> {
+    with_vm_lock(src_loc!(), || {
+        get_compiler(&format!("with_lock {}", reason))
+    })
 }
