@@ -10,7 +10,7 @@ use crate::{
         RUBY_FL_FREEZE, RUBY_IMMEDIATE_MASK, RUBY_OFFSET_EC_THREAD_PTR, RUBY_OFFSET_RBASIC_FLAGS,
         RUBY_OFFSET_RSTRING_AS_HEAP_LEN, RUBY_OFFSET_RSTRING_EMBED_LEN, RUBY_OFFSET_THREAD_SELF,
         RUBY_T_CLASS, RUBY_T_MODULE, RUBY_T_STRING, SIZEOF_VALUE_I32, VALUE, VM_BLOCK_HANDLER_NONE,
-        VM_ENV_DATA_INDEX_SPECVAL, VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF, rb_callable_method_entry_or_negative_no_cache,
+        VM_ENV_DATA_INDEX_SPECVAL, VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF, rb_callable_method_entry_or_negative_no_cache, rb_callable_method_entry_no_cache,
     },
     dev::stats::counted_exit,
     meta::{
@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-use super::globals::CodegenGlobals;
+use super::{globals::CodegenGlobals, generator::CodegenStatus};
 use crate::codegen::generator::CodeGenerator;
 
 impl CodeGenerator {
@@ -608,10 +608,12 @@ impl CodeGenerator {
                 .known_truthy()
         };
 
-        let target_cme = unsafe { rb_callable_method_entry_or_negative_no_cache(recv_class, mid) };
-
+        let target_cme = unsafe { rb_callable_method_entry_no_cache(recv_class, mid) };
+        if target_cme.is_null() {
+            return false
+        }
         // Should never be null, as in that case we will be returned a "negative CME"
-        assert!(!target_cme.is_null());
+        // assert!(!target_cme.is_null());
 
         let cme_def_type = unsafe { get_cme_def_type(target_cme) };
 
