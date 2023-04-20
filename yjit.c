@@ -984,7 +984,7 @@ void
 rb_yjit_for_each_iseq(rb_iseq_callback callback, void *data)
 {
     struct iseq_callback_data callback_data = { .callback = callback, .data = data };
-    rb_objspace_each_objects(for_each_iseq_i, (void *)&callback_data);
+    rb_objspace_each_objects_without_setup(for_each_iseq_i, (void *)&callback_data);
 }
 
 // For running write barriers from Rust. Required when we add a new edge in the
