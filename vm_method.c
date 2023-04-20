@@ -1403,6 +1403,7 @@ rb_callable_method_entry_or_negative_no_cache(VALUE klass, ID mid)
 
         if (!cme) {
             cme = negative_cme(mid);
+        }
         //     VALUE defined_class;
         //     rb_method_entry_t *me = search_method(klass, mid, &defined_class);
 
