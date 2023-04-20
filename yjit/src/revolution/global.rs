@@ -2,7 +2,6 @@ use std::mem::MaybeUninit;
 use std::sync::{Mutex, MutexGuard, Once};
 use std::thread;
 
-use crate::cruby::{with_vm_lock, src_loc};
 
 use super::old_world::OldWorld;
 

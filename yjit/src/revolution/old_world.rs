@@ -10,7 +10,7 @@ use crate::{
     codegen::globals::CodegenGlobals,
     cruby::{
         get_iseq_encoded_size, rb_bug, rb_gc_location, rb_gc_mark_movable,
-        rb_get_iseq_body_stack_max, rb_vm_barrier, src_loc, with_vm_lock, Qnil, VALUE,
+        rb_get_iseq_body_stack_max, rb_vm_barrier, Qnil, VALUE,
     },
     dev::{
         options::{get_option, parse_option},

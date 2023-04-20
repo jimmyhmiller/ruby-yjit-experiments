@@ -6,6 +6,7 @@ use std::os::raw::c_int;
 use std::ptr;
 use std::slice;
 
+use crate::cruby::rb_callable_method_entry_no_cache;
 pub use crate::virtualmem::CodePtr;
 
 use crate::{
@@ -29,7 +30,7 @@ use crate::{
         rb_ary_resurrect, rb_ary_store, rb_ary_tmp_new_from_values, rb_backref_get,
         rb_block_param_proxy, rb_builtin_function, rb_cArray, rb_cFalseClass, rb_cFloat, rb_cHash,
         rb_cInteger, rb_cNilClass, rb_cString, rb_cSymbol, rb_cTrueClass, rb_call_data,
-        rb_callable_method_entry, rb_callable_method_entry_t, rb_callinfo, rb_captured_block,
+        rb_callable_method_entry_t, rb_callinfo, rb_captured_block,
         rb_class_allocate_instance, rb_class_attached_object, rb_class_get_superclass,
         rb_ec_ary_new_from_values, rb_ec_str_resurrect, rb_ensure_iv_list_size, rb_fix_mod_fix,
         rb_gc_writebarrier, rb_get_alloc_func, rb_get_def_bmethod_proc,
@@ -4458,7 +4459,7 @@ impl CodeGenerator {
         );
 
         // Do method lookup
-        let mut cme = unsafe { rb_callable_method_entry(comptime_recv_klass, mid) };
+        let mut cme = unsafe { rb_callable_method_entry_no_cache(comptime_recv_klass, mid) };
         if cme.is_null() {
             // TODO: counter
             return CodegenStatus::CantCompile;
@@ -4647,7 +4648,7 @@ impl CodeGenerator {
                                 return CodegenStatus::CantCompile;
                             }
 
-                            cme = unsafe { rb_callable_method_entry(comptime_recv_klass, mid) };
+                            cme = unsafe { rb_callable_method_entry_no_cache(comptime_recv_klass, mid) };
                             if cme.is_null() {
                                 gen_counter_incr!(&mut self.asm, send_send_null_cme);
                                 return CodegenStatus::CantCompile;
@@ -5022,7 +5023,7 @@ impl CodeGenerator {
         let current_defined_class = unsafe { (*me).defined_class };
         let mid = unsafe { get_def_original_id((*me).def) };
 
-        if me != unsafe { rb_callable_method_entry(current_defined_class, (*me).called_id) } {
+        if me != unsafe { rb_callable_method_entry_no_cache(current_defined_class, (*me).called_id) } {
             // Though we likely could generate this call, as we are only concerned
             // with the method entry remaining valid, assume_method_lookup_stable
             // below requires that the method lookup matches as well
@@ -5076,7 +5077,7 @@ impl CodeGenerator {
         }
 
         // Do method lookup
-        let cme = unsafe { rb_callable_method_entry(comptime_superclass, mid) };
+        let cme = unsafe { rb_callable_method_entry_no_cache(comptime_superclass, mid) };
 
         if cme.is_null() {
             return CodegenStatus::CantCompile;

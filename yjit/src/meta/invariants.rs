@@ -5,11 +5,11 @@ use crate::{
     bbv::take_version_list,
     codegen::{generator::CodeGenerator, globals::CodegenGlobals},
     cruby::{
-        get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL, rb_callable_method_entry,
+        get_iseq_body_iseq_encoded, get_iseq_encoded_size, idNULL,
         rb_callable_method_entry_t, rb_gc_mark, rb_iseq_reset_jit_func, rb_iseq_t,
         rb_method_basic_definition_p, rb_vm_insn_decode, rb_yjit_multi_ractor_p,
         ruby_basic_operators, RedefinitionFlag,
-        YARVINSN_opt_getconstant_path, FL_TEST, IC, ID, ISEQ_TRANSLATED, VALUE,
+        YARVINSN_opt_getconstant_path, FL_TEST, IC, ID, ISEQ_TRANSLATED, VALUE, rb_callable_method_entry_no_cache,
     },
     dev::options::get_option,
     dev::stats::{incr_counter, YjitExitLocations},
@@ -122,7 +122,7 @@ pub fn assume_method_basic_definition(
     mid: ID,
 ) -> bool {
     if unsafe { rb_method_basic_definition_p(klass, mid) } != 0 {
-        let cme = unsafe { rb_callable_method_entry(klass, mid) };
+        let cme = unsafe { rb_callable_method_entry_no_cache(klass, mid) };
         assume_method_lookup_stable(code_generator, cme);
         true
     } else {

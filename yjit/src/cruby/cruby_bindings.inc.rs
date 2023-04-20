@@ -1150,8 +1150,11 @@ extern "C" {
         elts: *const VALUE,
     ) -> VALUE;
     pub fn rb_method_entry_at(obj: VALUE, id: ID) -> *const rb_method_entry_t;
-    pub fn rb_callable_method_entry(klass: VALUE, id: ID) -> *const rb_callable_method_entry_t;
-    pub fn rb_callable_method_entry_or_negative(
+    pub fn rb_callable_method_entry_no_cache(
+        klass: VALUE,
+        id: ID,
+    ) -> *const rb_callable_method_entry_t;
+    pub fn rb_callable_method_entry_or_negative_no_cache(
         klass: VALUE,
         id: ID,
     ) -> *const rb_callable_method_entry_t;

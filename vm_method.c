@@ -1389,6 +1389,45 @@ callable_method_entry_or_negative(VALUE klass, ID mid, VALUE *defined_class_ptr)
     return cme;
 }
 
+// A test because the other version of this method GCs which re-enters, which I'm pretty sure can cause
+// undefined behavior in a number of ways.
+const rb_callable_method_entry_t *
+rb_callable_method_entry_or_negative_no_cache(VALUE klass, ID mid)
+{
+    const rb_callable_method_entry_t *cme;
+
+    VM_ASSERT(RB_TYPE_P(klass, T_CLASS) || RB_TYPE_P(klass, T_ICLASS));
+    RB_VM_LOCK_ENTER();
+    {
+        cme = cached_callable_method_entry(klass, mid);
+
+        if (!cme) {
+            VALUE defined_class;
+            rb_method_entry_t *me = search_method(klass, mid, &defined_class);
+
+            if (me != NULL) {
+                cme = prepare_callable_method_entry(defined_class, mid, me, TRUE);
+            }
+            else {
+                cme = negative_cme(mid);
+            }
+        }
+    }
+    RB_VM_LOCK_LEAVE();
+
+    return cme;
+}
+
+const rb_callable_method_entry_t *
+rb_callable_method_entry_no_cache(VALUE klass, ID mid)
+{
+    const rb_callable_method_entry_t *cme;
+    cme = rb_callable_method_entry_or_negative_no_cache(klass, mid);
+    return !UNDEFINED_METHOD_ENTRY_P(cme) ? cme : NULL;
+}
+
+
+
 // This is exposed for YJIT so that we can make assumptions that methods are
 // not defined.
 const rb_callable_method_entry_t *

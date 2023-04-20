@@ -3,14 +3,14 @@ use crate::{
     cruby::{
         get_cme_def_type, idRespond_to_missing, rb_cArray, rb_cBasicObject, rb_cInteger,
         rb_cModule, rb_cNilClass, rb_cString, rb_cSymbol, rb_cThread,
-        rb_callable_method_entry_or_negative, rb_callable_method_entry_t, rb_callinfo, rb_mKernel,
+        rb_callable_method_entry_t, rb_callinfo, rb_mKernel,
         rb_obj_class, rb_obj_is_kind_of, rb_singleton_class, rb_str_buf_append, rb_str_bytesize,
         rb_str_dup, rb_sym2id, rb_yjit_str_simple_append, IseqPtr, Qfalse, Qtrue,
         METHOD_ENTRY_VISI, METHOD_VISI_PUBLIC, METHOD_VISI_UNDEF, RB_TYPE_P, RUBY_ENCODING_MASK,
         RUBY_FL_FREEZE, RUBY_IMMEDIATE_MASK, RUBY_OFFSET_EC_THREAD_PTR, RUBY_OFFSET_RBASIC_FLAGS,
         RUBY_OFFSET_RSTRING_AS_HEAP_LEN, RUBY_OFFSET_RSTRING_EMBED_LEN, RUBY_OFFSET_THREAD_SELF,
         RUBY_T_CLASS, RUBY_T_MODULE, RUBY_T_STRING, SIZEOF_VALUE_I32, VALUE, VM_BLOCK_HANDLER_NONE,
-        VM_ENV_DATA_INDEX_SPECVAL, VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF,
+        VM_ENV_DATA_INDEX_SPECVAL, VM_METHOD_TYPE_REFINED, VM_METHOD_TYPE_UNDEF, rb_callable_method_entry_or_negative_no_cache,
     },
     dev::stats::counted_exit,
     meta::{
@@ -608,7 +608,7 @@ impl CodeGenerator {
                 .known_truthy()
         };
 
-        let target_cme = unsafe { rb_callable_method_entry_or_negative(recv_class, mid) };
+        let target_cme = unsafe { rb_callable_method_entry_or_negative_no_cache(recv_class, mid) };
 
         // Should never be null, as in that case we will be returned a "negative CME"
         assert!(!target_cme.is_null());
