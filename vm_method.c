@@ -1402,16 +1402,17 @@ rb_callable_method_entry_or_negative_no_cache(VALUE klass, ID mid)
         cme = cached_callable_method_entry(klass, mid);
 
         if (!cme) {
-            VALUE defined_class;
-            rb_method_entry_t *me = search_method(klass, mid, &defined_class);
+            cme = negative_cme(mid);
+        //     VALUE defined_class;
+        //     rb_method_entry_t *me = search_method(klass, mid, &defined_class);
 
-            if (me != NULL) {
-                cme = prepare_callable_method_entry(defined_class, mid, me, TRUE);
-            }
-            else {
-                cme = negative_cme(mid);
-            }
-        }
+        //     if (me != NULL) {
+        //         cme = prepare_callable_method_entry(defined_class, mid, me, TRUE);
+        //     }
+        //     else {
+        //         cme = negative_cme(mid);
+        //     }
+        // }
     }
     RB_VM_LOCK_LEAVE();
 
